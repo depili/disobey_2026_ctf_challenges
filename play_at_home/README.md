@@ -21,6 +21,8 @@ Files: garbage
 
 This one had a hardware component to pwn, so unfortunately you cannot play it at home properly, maybe if I feel like it I will provide an emulator solution later...
 
+The code should work with emulators, you will just be missing the TFT display output, which will make the challenge harder to understand.
+
 True players will build their own from https://gitlab.com/Depili/z180
 
 ```
