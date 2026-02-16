@@ -1,0 +1,397 @@
+ AS V1.42 Beta [Bld 254] - Source File pwn_2.asm - Page 1 - 16.02.2026 10:42:18
+
+
+    1/    0 :                           		cpu	z180
+    2/    0 :                           		RELAXED	ON
+    3/    0 :                           		org	0
+    4/    0 :                           
+    5/    0 :                           		include z180.asm
+(1)  128/    0 :                        		listing on
+(1)  129/    0 :                        
+    6/    0 :                           
+    7/ DE00 :                           		phase	0DE00h
+    8/ DE00 :                           
+    9/ DE00 : =4C9H                     puts0		equ	04c9h
+   10/ DE00 : =4D2H                     puts_tft	equ	04d2h
+   11/ DE00 :                           
+   12/ DE00 :                           		rept	128
+   13/ DE00 :                           		nop
+   14/ DE00 :                           		endm
+   13/ DE00 : 00                        		nop
+   13/ DE01 : 00                        		nop
+   13/ DE02 : 00                        		nop
+   13/ DE03 : 00                        		nop
+   13/ DE04 : 00                        		nop
+   13/ DE05 : 00                        		nop
+   13/ DE06 : 00                        		nop
+   13/ DE07 : 00                        		nop
+   13/ DE08 : 00                        		nop
+   13/ DE09 : 00                        		nop
+   13/ DE0A : 00                        		nop
+   13/ DE0B : 00                        		nop
+   13/ DE0C : 00                        		nop
+   13/ DE0D : 00                        		nop
+   13/ DE0E : 00                        		nop
+   13/ DE0F : 00                        		nop
+   13/ DE10 : 00                        		nop
+   13/ DE11 : 00                        		nop
+   13/ DE12 : 00                        		nop
+   13/ DE13 : 00                        		nop
+   13/ DE14 : 00                        		nop
+   13/ DE15 : 00                        		nop
+   13/ DE16 : 00                        		nop
+   13/ DE17 : 00                        		nop
+   13/ DE18 : 00                        		nop
+   13/ DE19 : 00                        		nop
+   13/ DE1A : 00                        		nop
+   13/ DE1B : 00                        		nop
+   13/ DE1C : 00                        		nop
+   13/ DE1D : 00                        		nop
+   13/ DE1E : 00                        		nop
+   13/ DE1F : 00                        		nop
+   13/ DE20 : 00                        		nop
+   13/ DE21 : 00                        		nop
+   13/ DE22 : 00                        		nop
+   13/ DE23 : 00                        		nop
+   13/ DE24 : 00                        		nop
+   13/ DE25 : 00                        		nop
+   13/ DE26 : 00                        		nop
+   13/ DE27 : 00                        		nop
+   13/ DE28 : 00                        		nop
+   13/ DE29 : 00                        		nop
+   13/ DE2A : 00                        		nop
+   13/ DE2B : 00                        		nop
+ AS V1.42 Beta [Bld 254] - Source File pwn_2.asm - Page 2 - 16.02.2026 10:42:18
+
+
+   13/ DE2C : 00                        		nop
+   13/ DE2D : 00                        		nop
+   13/ DE2E : 00                        		nop
+   13/ DE2F : 00                        		nop
+   13/ DE30 : 00                        		nop
+   13/ DE31 : 00                        		nop
+   13/ DE32 : 00                        		nop
+   13/ DE33 : 00                        		nop
+   13/ DE34 : 00                        		nop
+   13/ DE35 : 00                        		nop
+   13/ DE36 : 00                        		nop
+   13/ DE37 : 00                        		nop
+   13/ DE38 : 00                        		nop
+   13/ DE39 : 00                        		nop
+   13/ DE3A : 00                        		nop
+   13/ DE3B : 00                        		nop
+   13/ DE3C : 00                        		nop
+   13/ DE3D : 00                        		nop
+   13/ DE3E : 00                        		nop
+   13/ DE3F : 00                        		nop
+   13/ DE40 : 00                        		nop
+   13/ DE41 : 00                        		nop
+   13/ DE42 : 00                        		nop
+   13/ DE43 : 00                        		nop
+   13/ DE44 : 00                        		nop
+   13/ DE45 : 00                        		nop
+   13/ DE46 : 00                        		nop
+   13/ DE47 : 00                        		nop
+   13/ DE48 : 00                        		nop
+   13/ DE49 : 00                        		nop
+   13/ DE4A : 00                        		nop
+   13/ DE4B : 00                        		nop
+   13/ DE4C : 00                        		nop
+   13/ DE4D : 00                        		nop
+   13/ DE4E : 00                        		nop
+   13/ DE4F : 00                        		nop
+   13/ DE50 : 00                        		nop
+   13/ DE51 : 00                        		nop
+   13/ DE52 : 00                        		nop
+   13/ DE53 : 00                        		nop
+   13/ DE54 : 00                        		nop
+   13/ DE55 : 00                        		nop
+   13/ DE56 : 00                        		nop
+   13/ DE57 : 00                        		nop
+   13/ DE58 : 00                        		nop
+   13/ DE59 : 00                        		nop
+   13/ DE5A : 00                        		nop
+   13/ DE5B : 00                        		nop
+   13/ DE5C : 00                        		nop
+   13/ DE5D : 00                        		nop
+   13/ DE5E : 00                        		nop
+   13/ DE5F : 00                        		nop
+   13/ DE60 : 00                        		nop
+   13/ DE61 : 00                        		nop
+   13/ DE62 : 00                        		nop
+   13/ DE63 : 00                        		nop
+   13/ DE64 : 00                        		nop
+   13/ DE65 : 00                        		nop
+   13/ DE66 : 00                        		nop
+   13/ DE67 : 00                        		nop
+ AS V1.42 Beta [Bld 254] - Source File pwn_2.asm - Page 3 - 16.02.2026 10:42:18
+
+
+   13/ DE68 : 00                        		nop
+   13/ DE69 : 00                        		nop
+   13/ DE6A : 00                        		nop
+   13/ DE6B : 00                        		nop
+   13/ DE6C : 00                        		nop
+   13/ DE6D : 00                        		nop
+   13/ DE6E : 00                        		nop
+   13/ DE6F : 00                        		nop
+   13/ DE70 : 00                        		nop
+   13/ DE71 : 00                        		nop
+   13/ DE72 : 00                        		nop
+   13/ DE73 : 00                        		nop
+   13/ DE74 : 00                        		nop
+   13/ DE75 : 00                        		nop
+   13/ DE76 : 00                        		nop
+   13/ DE77 : 00                        		nop
+   13/ DE78 : 00                        		nop
+   13/ DE79 : 00                        		nop
+   13/ DE7A : 00                        		nop
+   13/ DE7B : 00                        		nop
+   13/ DE7C : 00                        		nop
+   13/ DE7D : 00                        		nop
+   13/ DE7E : 00                        		nop
+   13/ DE7F : 00                        		nop
+   15/ DE80 : F3                        		di
+   16/ DE81 :                           
+   17/ DE81 :                           		; Disable the DMA
+   18/ DE81 : AF                        		XOR	A
+   19/ DE82 : ED 39 B0                  		OUT0	(Z180_DSTAT), A
+   20/ DE85 : ED 39 B2                  		OUT0	(Z180_DCNTL), A
+   21/ DE88 :                           
+   22/ DE88 :                           
+   23/ DE88 : 21 AD DE                  		LD	HL, 0deadh
+   24/ DE8B :                           		; Set Source Address (Memory)
+   25/ DE8B : ED 29 A0                  		OUT0	(Z180_SAR0L), L
+   26/ DE8E : ED 21 A1                  		OUT0	(Z180_SAR0H), H
+   27/ DE91 : AF                        		XOR	A
+   28/ DE92 : ED 39 A2                  		OUT0	(Z180_SAR0B), A
+   29/ DE95 :                           
+   30/ DE95 :                           		; Set Destination Address (Memory)
+   31/ DE95 : 21 00 90                  		LD	HL, 9000h
+   32/ DE98 : ED 29 A3                  		OUT0	(Z180_DAR0L), L
+   33/ DE9B : ED 21 A4                  		OUT0	(Z180_DAR0H), H
+   34/ DE9E : 7A                        		LD	A, D
+   35/ DE9F : ED 39 A5                  		OUT0	(Z180_DAR0B), A
+   36/ DEA2 :                           
+   37/ DEA2 :                           		; Set Byte Count
+   38/ DEA2 : 21 18 02                  		LD	HL, 218h
+   39/ DEA5 : ED 29 A6                  		OUT0	(Z180_BCR0L), L
+   40/ DEA8 : ED 21 A7                  		OUT0	(Z180_BCR0H), H
+   41/ DEAB :                           
+   42/ DEAB :                           		; DMODE
+   43/ DEAB :                           		; Bit 7 - unused
+   44/ DEAB :                           		; Bit 6 - unused
+   45/ DEAB :                           		; Bit 5 - DM1
+   46/ DEAB :                           		; Bit 4 - DM0 - 11 = IO destination
+   47/ DEAB :                           		; Bit 3 - SM1
+   48/ DEAB :                           		; Bit 2 - SM0 - 00 = Memory++
+   49/ DEAB :                           		; Bit 1 - MMOD
+   50/ DEAB :                           		; Bit 0 - unused
+ AS V1.42 Beta [Bld 254] - Source File pwn_2.asm - Page 4 - 16.02.2026 10:42:18
+
+
+   51/ DEAB :                           
+   52/ DEAB : 3E 02                     		LD	A, 00000010B		; Ch0 Mem++ -> Mem++
+   53/ DEAD : ED 39 B1                  		OUT0	(Z180_DMODE), A
+   54/ DEB0 :                           
+   55/ DEB0 :                           		; Bit 7: DE1 (Enable Channel 1)
+   56/ DEB0 :                           		; Bit 6: DE0 (Enable Channel 0)
+   57/ DEB0 :                           		; Bit 5: !DWE1 (Inverted write enable channel 1, set to 0 to write DE1)
+   58/ DEB0 :                           		; Bit 4: !DWE0
+   59/ DEB0 :                           		; Bit 3: DIE1 (DMA interrupt enable channel 1)
+   60/ DEB0 :                           		; Bit 2: DIE0
+   61/ DEB0 :                           		; Bit 1: unused
+   62/ DEB0 :                           		; Bit 0: DME (DMA master enable)
+   63/ DEB0 : 3E 41                     		LD	A, 01000001B
+   64/ DEB2 : ED 39 B0                  		OUT0	(Z180_DSTAT), A
+   65/ DEB5 : 21 00 90                  		LD	HL, 9000h
+   66/ DEB8 : CD C9 04                  		CALL	puts0
+   67/ DEBB : C3 00 00                  		JP	0
+   68/ DEBE :                           
+   69/ DEBE :                           
+   70/ DEBE :                           
+   71/ DEBE :                           
+   72/ DEBE :                           		align 2
+   73/ DEBE :                           		rept	80
+   74/ DEBE :                           		dw	0DE41h
+   75/ DEBE :                           		endm
+   74/ DEBE : 41 DE                     		dw	0DE41h
+   74/ DEC0 : 41 DE                     		dw	0DE41h
+   74/ DEC2 : 41 DE                     		dw	0DE41h
+   74/ DEC4 : 41 DE                     		dw	0DE41h
+   74/ DEC6 : 41 DE                     		dw	0DE41h
+   74/ DEC8 : 41 DE                     		dw	0DE41h
+   74/ DECA : 41 DE                     		dw	0DE41h
+   74/ DECC : 41 DE                     		dw	0DE41h
+   74/ DECE : 41 DE                     		dw	0DE41h
+   74/ DED0 : 41 DE                     		dw	0DE41h
+   74/ DED2 : 41 DE                     		dw	0DE41h
+   74/ DED4 : 41 DE                     		dw	0DE41h
+   74/ DED6 : 41 DE                     		dw	0DE41h
+   74/ DED8 : 41 DE                     		dw	0DE41h
+   74/ DEDA : 41 DE                     		dw	0DE41h
+   74/ DEDC : 41 DE                     		dw	0DE41h
+   74/ DEDE : 41 DE                     		dw	0DE41h
+   74/ DEE0 : 41 DE                     		dw	0DE41h
+   74/ DEE2 : 41 DE                     		dw	0DE41h
+   74/ DEE4 : 41 DE                     		dw	0DE41h
+   74/ DEE6 : 41 DE                     		dw	0DE41h
+   74/ DEE8 : 41 DE                     		dw	0DE41h
+   74/ DEEA : 41 DE                     		dw	0DE41h
+   74/ DEEC : 41 DE                     		dw	0DE41h
+   74/ DEEE : 41 DE                     		dw	0DE41h
+   74/ DEF0 : 41 DE                     		dw	0DE41h
+   74/ DEF2 : 41 DE                     		dw	0DE41h
+   74/ DEF4 : 41 DE                     		dw	0DE41h
+   74/ DEF6 : 41 DE                     		dw	0DE41h
+   74/ DEF8 : 41 DE                     		dw	0DE41h
+   74/ DEFA : 41 DE                     		dw	0DE41h
+   74/ DEFC : 41 DE                     		dw	0DE41h
+   74/ DEFE : 41 DE                     		dw	0DE41h
+   74/ DF00 : 41 DE                     		dw	0DE41h
+   74/ DF02 : 41 DE                     		dw	0DE41h
+ AS V1.42 Beta [Bld 254] - Source File pwn_2.asm - Page 5 - 16.02.2026 10:42:18
+
+
+   74/ DF04 : 41 DE                     		dw	0DE41h
+   74/ DF06 : 41 DE                     		dw	0DE41h
+   74/ DF08 : 41 DE                     		dw	0DE41h
+   74/ DF0A : 41 DE                     		dw	0DE41h
+   74/ DF0C : 41 DE                     		dw	0DE41h
+   74/ DF0E : 41 DE                     		dw	0DE41h
+   74/ DF10 : 41 DE                     		dw	0DE41h
+   74/ DF12 : 41 DE                     		dw	0DE41h
+   74/ DF14 : 41 DE                     		dw	0DE41h
+   74/ DF16 : 41 DE                     		dw	0DE41h
+   74/ DF18 : 41 DE                     		dw	0DE41h
+   74/ DF1A : 41 DE                     		dw	0DE41h
+   74/ DF1C : 41 DE                     		dw	0DE41h
+   74/ DF1E : 41 DE                     		dw	0DE41h
+   74/ DF20 : 41 DE                     		dw	0DE41h
+   74/ DF22 : 41 DE                     		dw	0DE41h
+   74/ DF24 : 41 DE                     		dw	0DE41h
+   74/ DF26 : 41 DE                     		dw	0DE41h
+   74/ DF28 : 41 DE                     		dw	0DE41h
+   74/ DF2A : 41 DE                     		dw	0DE41h
+   74/ DF2C : 41 DE                     		dw	0DE41h
+   74/ DF2E : 41 DE                     		dw	0DE41h
+   74/ DF30 : 41 DE                     		dw	0DE41h
+   74/ DF32 : 41 DE                     		dw	0DE41h
+   74/ DF34 : 41 DE                     		dw	0DE41h
+   74/ DF36 : 41 DE                     		dw	0DE41h
+   74/ DF38 : 41 DE                     		dw	0DE41h
+   74/ DF3A : 41 DE                     		dw	0DE41h
+   74/ DF3C : 41 DE                     		dw	0DE41h
+   74/ DF3E : 41 DE                     		dw	0DE41h
+   74/ DF40 : 41 DE                     		dw	0DE41h
+   74/ DF42 : 41 DE                     		dw	0DE41h
+   74/ DF44 : 41 DE                     		dw	0DE41h
+   74/ DF46 : 41 DE                     		dw	0DE41h
+   74/ DF48 : 41 DE                     		dw	0DE41h
+   74/ DF4A : 41 DE                     		dw	0DE41h
+   74/ DF4C : 41 DE                     		dw	0DE41h
+   74/ DF4E : 41 DE                     		dw	0DE41h
+   74/ DF50 : 41 DE                     		dw	0DE41h
+   74/ DF52 : 41 DE                     		dw	0DE41h
+   74/ DF54 : 41 DE                     		dw	0DE41h
+   74/ DF56 : 41 DE                     		dw	0DE41h
+   74/ DF58 : 41 DE                     		dw	0DE41h
+   74/ DF5A : 41 DE                     		dw	0DE41h
+   74/ DF5C : 41 DE                     		dw	0DE41h
+   76/ DF5E :                           
+ AS V1.42 Beta [Bld 254] - Source File pwn_2.asm - Page 6 - 16.02.2026 10:42:18
+
+
+  Symbol Table (* = unused):
+  --------------------------
+
+*ARCHITECTURE :  "x86_64-apple-osx" - | *BDOS :                           5 - |
+*CASESENSITIVE :                  0 - | *CONIN :                          1 - |
+*CONOUT :                         2 - | *CONSTPI :        3.141592653589793 - |
+*DATE :                "16.02.2026" - | *FALSE :                          0 - |
+*FULLPMMU :                       1 - | *HAS64 :                          1 - |
+*HASFPU :                         0 - | *HASPMMU :                        0 - |
+*INSUPMODE :                      0 - | *LISTON :                         1 - |
+*MACEXP :                         7 - | *MOMCPU :                       180 - |
+*MOMCPUNAME :                "Z180" - | *NESTMAX :                      100 - |
+*PADDING :                        1 - |  PUTS0 :                        4C9 - |
+*PUTS_TFT :                     4D2 - | *RELAXED :                        1 - |
+*TFT_565 :                       55 - | *TFT_888 :                       66 - |
+*TFT_CASET :                     2A - | *TFT_CMD :                       54 - |
+*TFT_CMD_NOP :                    0 - | *TFT_COLMOD :                    3A - |
+*TFT_COLS :                     0A0 - | *TFT_DATA :                      55 - |
+*TFT_DISPOFF :                   28 - | *TFT_DISPON :                    29 - |
+*TFT_GAMMA :                      2 - | *TFT_GAMSET :                    26 - |
+*TFT_IDMOFF :                    38 - | *TFT_IDMON :                     39 - |
+*TFT_INVOFF :                    20 - | *TFT_INVON :                     21 - |
+*TFT_MADCTL :                    36 - | *TFT_MADCTL_MH :                  4 - |
+*TFT_MADCTL_ML :                 10 - |  TFT_MADCTL_MV :                 20 - |
+*TFT_MADCTL_MX :                 40 - |  TFT_MADCTL_MY :                 80 - |
+ TFT_MADCTL_RGB :                 8 - | *TFT_MADCTL_VAL :               0A8 - |
+*TFT_NORON :                     13 - | *TFT_PTLAR :                     30 - |
+*TFT_PTLON :                     12 - | *TFT_RAMRD :                     2E - |
+*TFT_RAMWR :                     2C - | *TFT_RASET :                     2B - |
+*TFT_RDDCOLMOD :                 0C - | *TFT_RDDID :                      4 - |
+*TFT_RDDIM :                     0D - | *TFT_RDDPM :                     0A - |
+*TFT_RDDSDR :                    0F - | *TFT_RDDSM :                     0E - |
+*TFT_RDDST :                      9 - | *TFT_RDID1 :                    0DA - |
+*TFT_RDID2 :                    0DB - | *TFT_RDID3 :                    0DC - |
+*TFT_RGBSET :                    2D - | *TFT_ROWS :                      80 - |
+*TFT_SCRLAR :                    33 - | *TFT_SLPIN :                     10 - |
+*TFT_SLPOUT :                    11 - | *TFT_SWRESET :                    1 - |
+*TFT_TEOFF :                     34 - | *TFT_TEON :                      35 - |
+*TFT_VSCSAD :                    37 - | *TIME :                  "10:42:18" - |
+*TRUE :                           1 - | *VERSION :                     142F - |
+*Z180_ASEXT0 :                   92 - | *Z180_ASEXT1 :                   93 - |
+*Z180_ASTC0H :                   9B - | *Z180_ASTC0L :                   9A - |
+*Z180_ASTC1H :                   9D - | *Z180_ASTC1L :                   9C - |
+ Z180_BASE :                     80 - | *Z180_BBR :                     0B9 - |
+ Z180_BCR0H :                   0A7 - |  Z180_BCR0L :                   0A6 - |
+*Z180_BCR1H :                   0AF - | *Z180_BCR1L :                   0AE - |
+*Z180_CBAR :                    0BA - | *Z180_CBR :                     0B8 - |
+*Z180_CCR :                      9F - | *Z180_CMR :                      9E - |
+*Z180_CNTLA0 :                   80 - | *Z180_CNTLA1 :                   81 - |
+*Z180_CNTLB0 :                   82 - | *Z180_CNTLB1 :                   83 - |
+*Z180_CNTR :                     8A - |  Z180_DAR0B :                   0A5 - |
+ Z180_DAR0H :                   0A4 - |  Z180_DAR0L :                   0A3 - |
+ Z180_DCNTL :                   0B2 - |  Z180_DMODE :                   0B1 - |
+ Z180_DSTAT :                   0B0 - | *Z180_FRC :                      98 - |
+*Z180_IAR1B :                   0AD - | *Z180_IAR1H :                   0AC - |
+*Z180_IAR1L :                   0AB - | *Z180_ICR :                     0BF - |
+*Z180_IL :                      0B3 - | *Z180_ITC :                     0B4 - |
+*Z180_MAR1B :                   0AA - | *Z180_MAR1H :                   0A9 - |
+*Z180_MAR1L :                   0A8 - | *Z180_OMCR :                    0BE - |
+*Z180_RCR :                     0B6 - | *Z180_RDR0 :                     88 - |
+ AS V1.42 Beta [Bld 254] - Source File pwn_2.asm - Page 7 - 16.02.2026 10:42:18
+
+
+*Z180_RDR1 :                     89 - | *Z180_RLDR0H :                   8F - |
+*Z180_RLDR0L :                   8E - | *Z180_RLDR1H :                   97 - |
+*Z180_RLDR1L :                   96 - |  Z180_SAR0B :                   0A2 - |
+ Z180_SAR0H :                   0A1 - |  Z180_SAR0L :                   0A0 - |
+*Z180_STAT0 :                    84 - | *Z180_STAT1 :                    85 - |
+*Z180_TCR :                      90 - | *Z180_TDR0 :                     86 - |
+*Z180_TDR1 :                     87 - | *Z180_TMDR0H :                   8D - |
+*Z180_TMDR0L :                   8C - | *Z180_TMDR1H :                   95 - |
+*Z180_TMDR1L :                   94 - | *Z180_TRDR :                     8B - |
+
+    132 symbols
+    116 unused symbols
+
+ AS V1.42 Beta [Bld 254] - Source File pwn_2.asm - Page 8 - 16.02.2026 10:42:18
+
+
+  Code Pages:
+  ----------
+
+STANDARD (0 changed characters)
+
+1 code page
+
+0.00 seconds assembly time
+
+    205 lines source file
+    413 lines incl. macro expansions
+      1 pass
+      0 errors
+      0 warnings

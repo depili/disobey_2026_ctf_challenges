@@ -1,0 +1,1319 @@
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 1 - 16.02.2026 10:22:44
+
+
+    1/    0 :                           		CPU	Z180
+    2/    0 :                           		RELAXED	ON
+    3/    0 :                           
+    4/    0 :                           		include "z180.asm"
+(1)  128/    0 :                        		listing on
+(1)  129/    0 :                        
+    5/    0 :                           
+    6/    0 : =1H                       secrets		EQU	1
+    7/    0 :                           
+    8/    0 :                           ; Parameters for the transfer (must be defined elsewhere in your code)
+    9/    0 : =8000H                    DMA_SRC_ADDR	EQU	08000H		; Logical start address of the memory buffer (16-bit)
+   10/    0 : =100H                     DMA_COUNT	EQU	0100H		; Number of bytes to transfer (up to 65535)
+   11/    0 : =0C0H                     IO_PORT_ADDR	EQU	0C0H		; The 8-bit I/O Port address to write to
+   12/    0 : =9000H                    DMA_DEST_ADDR	EQU	09000H		; Logical start address of the memory buffer (16-bit)
+   13/    0 :                           
+   14/    0 :                           
+   15/    0 : =8000H                    mem_start	equ	08000h
+   16/    0 : =0H                       fp_led_io	equ	00h
+   17/    0 :                           
+   18/    0 :                           
+   19/    0 : =1194000H                 CPUOSC		.SET	18432000	; CPU OSC FREQ IN MHZ
+   20/    0 : =2H                       INTMODE		.SET	2		; INTERRUPTS: 0=NONE, 1=MODE 1, 2=MODE 2, 3=MODE 3 (Z280)
+   21/    0 :                           ;
+   22/    0 : =200H                     RAMSIZE		.SET	512		; SIZE OF RAM IN KB (MUST MATCH YOUR HARDWARE!!!)
+   23/    0 : =200H                     ROMSIZE		.SET	512		; SIZE OF ROM IN KB (MUST MATCH YOUR HARDWARE!!!)
+   24/    0 : =0FFH                     APP_BNKS	.SET	$FF		; BANKS TO RESERVE FOR APP USE ($FF FOR AUTO SIZING)
+   25/    0 : =200H                     RAMBIAS		.SET	ROMSIZE		; OFFSET OF START OF RAM IN PHYSICAL ADDRESS SPACE
+   26/    0 : =78H                      MPGSEL_0	.SET	$78		; Z2 MEM MGR BANK 0 PAGE SELECT REG (WRITE ONLY)
+   27/    0 : =79H                      MPGSEL_1	.SET	$79		; Z2 MEM MGR BANK 1 PAGE SELECT REG (WRITE ONLY)
+   28/    0 : =7AH                      MPGSEL_2	.SET	$7A		; Z2 MEM MGR BANK 2 PAGE SELECT REG (WRITE ONLY)
+   29/    0 : =7BH                      MPGSEL_3	.SET	$7B		; Z2 MEM MGR BANK 3 PAGE SELECT REG (WRITE ONLY)
+   30/    0 : =7CH                      MPGENA		.SET	$7C		; Z2 MEM MGR PAGING ENABLE REGISTER (BIT 0, WRITE ONLY)
+   31/    0 :                           ;
+   32/    0 : =0H                       Z180_CLKDIV	.SET	0		; Z180: CHK DIV: 0=OSC/2, 1=OSC, 2=OSC*2
+   33/    0 : =0H                       Z180_MEMWAIT	.SET	0		; Z180: MEMORY WAIT STATES (0-3)
+   34/    0 : =1H                       Z180_IOWAIT	.SET	1		; Z180: I/O WAIT STATES TO ADD ABOVE 1 W/S BUILT-IN (0-3)
+   35/    0 : =6H                       Z180_CNTR_DEF	.EQU	$06		; DEFAULT VALUE FOR Z180 CSIO CONFIG
+   36/    0 :                           
+   37/    0 :                           
+   38/    0 : =64H                      ASCI_DEF_CNTLA	.EQU	$64
+   39/    0 : =20H                      ASCI_DEF_CNTLB	.EQU	$20
+   40/    0 : =60H                      ASCI_DEF_ASEXT	.EQU	$60
+   41/    0 :                           ;
+   42/    0 : =20H                      ASCI_BUFSZ	.EQU	32		; RECEIVE RING BUFFER SIZE
+   43/    0 :                           ;
+   44/    0 : =0H                       ASCI_NONE	.EQU	0		; NOT PRESENT
+   45/    0 : =1H                       ASCI_ASCI	.EQU	1		; ORIGINAL ASCI (Z8S180 REV. K)
+   46/    0 : =2H                       ASCI_ASCIB	.EQU	2		; REVISED ASCI W/ BRG & FIFO (Z8S180 REV. N)
+   47/    0 :                           ;
+   48/    0 : =80H                      ASCI0_BASE	.EQU	Z180_BASE	; RELATIVE TO Z180 INTERNAL IO PORTS
+   49/    0 : =81H                      ASCI1_BASE	.EQU	Z180_BASE + 1	; RELATIVE TO Z180 INTERNAL IO PORTS
+   50/    0 :                           ;
+   51/    0 : =10H                      ASCI_RTS	.EQU	%00010000	; ~RTS BIT OF CNTLA REG
+   52/    0 :                           
+   53/    0 : =0DD00H                   stack		equ	0DD00h
+   54/    0 :                           
+   55/    0 :                           		; Memory, stack will be bellow this
+   56/ DD00 :                           		ORG	stack
+   57/ DD00 :                           
+   58/ DD00 :                           asci0_tx_buf	ds	256
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 2 - 16.02.2026 10:22:44
+
+
+   59/ DE00 :                           asci0_rx_buf	ds	256		; FIXME 512 byte buffers to comply with irc?
+   60/ DF00 :                           		align	0100h
+   61/ DF00 :                           isr_page:	ds	256
+   62/ E000 :                           asci0_rx_rd:	ds	1		; RX read pointer
+   63/ E001 :                           asci0_rx_wr:	ds	1		; RX write pointer
+   64/ E002 :                           asci0_tx_rd:	ds	1		; TX read pointer
+   65/ E003 :                           asci0_tx_wr:	ds	1		; TX write pointer
+   66/ E004 :                           tft_row:	ds	1
+   67/ E005 :                           tft_col:	ds	1
+   68/ E006 :                           led_state:	ds	1
+   69/ E007 :                           led_timer:	ds	1
+   70/ E008 :                           TFT_STACK:	DS	2
+   71/ E00A :                           TFT_BG:		Ds	2
+   72/ E00C :                           TFT_FG:		Ds	2
+   73/ E00E :                           
+   74/ E00E :                           
+   75/ E00E :                           
+   76/    0 :                           		ORG	0000H
+   77/    0 : 18 00                     		JR	MAIN
+   78/    2 :                           
+   79/    2 :                           MAIN:
+   80/    2 : F3                        		DI
+   81/    3 : ED 5E                     		IM	2
+   82/    5 : 3E 01                     		ld	a, 1h
+   83/    7 : D3 00                     		out	(fp_led_io), a
+   84/    9 :                           
+   85/    9 : 3E 80                     		LD	A,Z180_BASE
+   86/    B : ED 39 3F                  		OUT0	($3F),A		; AT RESET, ICR IS AT $3F
+   87/    E :                           
+   88/    E : AF                        		XOR	A
+   89/    F : ED 39 B6                  		OUT0	(Z180_RCR),A
+   90/   12 :                           
+   91/   12 :                           		; MASK OFF TIMER INTERRUPTS
+   92/   12 : AF                        		XOR	A
+   93/   13 : ED 39 90                  		OUT0	(Z180_TCR),A
+   94/   16 : ED 39 B4                  		OUT0	(Z180_ITC),A
+   95/   19 :                           
+   96/   19 :                           		; SET DEFAULT CPU CLOCK MULTIPLIERS (XTAL / 2)
+   97/   19 :                           		;
+   98/   19 :                           		; BILL MCMULLEN REPORTED THAT CMR NEEDS TO BE SET PRIOR TO CCR
+   99/   19 :                           		; WHEN USING A CPU FREQUENCY (PHI) THAT IS XTAL * 2.
+  100/   19 :                           		; HERE WE ARE SETTING CPU FREQUENCY TO XTAL / 2, BUT JUST
+  101/   19 :                           		; FOR GOOD MEASURE, CMR IS SET PRIOR TO CCR BELOW.
+  102/   19 :                           		; https://www.retrobrewcomputers.org/forum/index.php?t=msg&th=316&goto=5045&#msg_5045
+  103/   19 : AF                        		XOR	A
+  104/   1A : ED 39 9E                  		OUT0	(Z180_CMR),A
+  105/   1D : ED 39 9F                  		OUT0	(Z180_CCR),A
+  106/   20 :                           
+  107/   20 :                           
+  108/   20 :                           		; SET DEFAULT WAIT STATES
+  109/   20 : 3E F0                     		LD	A,$F0
+  110/   22 : ED 39 B2                  		OUT0	(Z180_DCNTL),A
+  111/   25 :                           
+  112/   25 :                           		; Z180 MMU SETUP
+  113/   25 : 3E 80                     		LD	A,$80
+  114/   27 : ED 39 BA                  		OUT0	(Z180_CBAR),A		; SETUP FOR 32K/32K BANK CONFIG
+  115/   2A :                           
+  116/   2A : 3E F0                     		LD	A,(RAMSIZE + RAMBIAS - 64) >> 2
+  117/   2C : ED 39 B8                  		OUT0	(Z180_CBR),A		; COMMON BASE = LAST (TOP) BANK
+  118/   2F :                           
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 3 - 16.02.2026 10:22:44
+
+
+  119/   2F :                           		; SET DEFAULT CSIO SPEED (INTERNAL CLOCK, SLOW AS POSSIBLE)
+  120/   2F : 3E 06                     		LD	A,Z180_CNTR_DEF		; DIV 1280, 14KHZ @ 18MHZ CLK
+  121/   31 : ED 39 8A                  		OUT0	(Z180_CNTR),A
+  122/   34 :                           
+  123/   34 :                           
+  124/   34 : 21 00 80                  		ld	hl, mem_start
+  125/   37 : 11 01 80                  		ld	de, mem_start + 1
+  126/   3A : 01 FF 7F                  		ld	bc, 0ffffh - mem_start
+  127/   3D : 36 00                     		ld	(hl), 00h
+  128/   3F : AF                        		xor	a
+  129/   40 : ED B0                     		ldir
+  130/   42 : 31 00 DD                  		ld	sp, stack
+  131/   45 :                           
+  132/   45 : 3E 02                     		ld	a, 02h
+  133/   47 : D3 00                     		out	(fp_led_io), a
+  134/   49 : 32 06 E0                  		ld	(led_state), a
+  135/   4C : 3E 32                     		ld	a, 50
+  136/   4E : 32 07 E0                  		ld	(led_timer), a
+  137/   51 :                           
+  138/   51 : CD 95 04                  		call	uart_init
+  139/   54 : 21 4F 05                  		ld	hl, banner
+  140/   57 : CD C3 04                  		call	puts0
+  141/   5A :                           
+  142/   5A :                           
+  143/   5A : CD 86 01                  		call	isr_init
+  144/   5D :                           
+  145/   5D : 3E 00                     		LD	A, 0
+  146/   5F : CD 2D 03                  		CALL	TFT_SET_BG
+  147/   62 : 3E 0A                     		LD	A, 10
+  148/   64 : CD 14 03                  		CALL	TFT_SET_FG
+  149/   67 :                           
+  150/   67 : CD 70 04                  		CALL	TFT_INIT
+  151/   6A : CD B4 01                  		CALL	TFT_CLEAR
+  152/   6D :                           
+  153/   6D : 21 4F 05                  		LD	HL, banner
+  154/   70 : CD CC 04                  		CALL	puts_tft
+  155/   73 :                           
+  156/   73 :                           
+  157/   73 : 3A 04 E0                  		LD	A, (tft_row)
+  158/   76 : 3C                        		INC	A
+  159/   77 : 32 04 E0                  		LD	(tft_row), A
+  160/   7A :                           
+  161/   7A : 21 A3 05                  		ld	hl, PROMPT
+  162/   7D : CD CC 04                  		CALL	puts_tft
+  163/   80 :                           
+  164/   80 : 21 00 DE                  		ld	HL, asci0_rx_buf
+  165/   83 : 22 01 E0                  		ld	(asci0_rx_wr), HL
+  166/   86 :                           
+  167/   86 :                           -
+  168/   86 : CD FB 04                  		call	getc0
+  169/   89 : 77                        		ld	(HL), A
+  170/   8A : 23                        		inc	HL
+  171/   8B :                           		; call	print_word0
+  172/   8B : CD 46 03                  		call	TFT_PRINT
+  173/   8E : FE 0D                     		cp	"\r"
+  174/   90 : 28 02                     		jr	z, .fake_process
+  175/   92 : 18 F2                     		jr	-
+  176/   94 : DD 21 00 DE               .fake_process	ld	ix, asci0_rx_buf
+  177/   98 : 21 BC 00                  		ld	hl, newline
+  178/   9B : CD CC 04                  		call	puts_tft
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 4 - 16.02.2026 10:22:44
+
+
+  179/   9E : DD 7E 02                  		ld	a, (ix+2)
+  180/   A1 : DD 46 03                  		ld	b, (ix+3)
+  181/   A4 : D6 30                     		sub	"0"
+  182/   A6 : 80                        		add	a, b
+  183/   A7 : D6 30                     		sub	"0"
+  184/   A9 : CD 1C 05                  		call	print_byte
+  185/   AC : 21 B5 05                  		ld	hl, PRICE
+  186/   AF : CD CC 04                  		call	puts_tft
+  187/   B2 : CD FB 04                  -		call	getc0
+  188/   B5 : FE 0D                     		cp	"\r"
+  189/   B7 : 20 F9                     		jr	nz, -
+  190/   B9 : C3 00 00                  		jp	0
+  191/   BC :                           
+  192/   BC :                           
+  193/   BC :                           newline:
+  194/   BC : 0D 0A 00                  		db	"\r\n",0
+  195/   BF :                           
+  196/   BF :                           z180_isr_table:
+  197/   BF : D1 00                     .int1		dw	ei_reti
+  198/   C1 : D1 00                     .int2		dw	ei_reti
+  199/   C3 : 41 01                     .prt0		dw	prt_isr
+  200/   C5 : 41 01                     .prt1		dw	prt_isr
+  201/   C7 : D1 00                     .dma0		dw	ei_reti
+  202/   C9 : D1 00                     .dma1		dw	ei_reti
+  203/   CB : D1 00                     .csi		dw	ei_reti
+  204/   CD : 6C 01                     .asci0		dw	asci_isr
+  205/   CF : 6C 01                     .asci1		dw	asci_isr
+  206/   D1 :                           
+  207/   D1 :                           ei_reti:
+  208/   D1 : FB                        		ei
+  209/   D2 : ED 4D                     		reti
+  210/   D4 :                           
+  211/   D4 :                           		align	100h	; Make exploiting slightly easier
+  212/  100 :                           		ds	41h
+  213/  141 :                           		; 50Hz timer interrupt
+  214/  141 :                           prt_isr:
+  215/  141 : F3                        		di
+  216/  142 : 08                        		ex	af, af'
+  217/  143 : D9                        		exx
+  218/  144 : ED 38 90                  		in0	a,(z180_tcr)		; Ack interrupt
+  219/  147 : ED 38 8C                  		in0	a,(z180_tmdr0l)
+  220/  14A : ED 38 94                  		in0	a,(z180_tmdr1l)
+  221/  14D :                           
+  222/  14D : 3A 07 E0                  		ld	a, (led_timer)
+  223/  150 : 3D                        		dec	a
+  224/  151 : 28 05                     		jr	z, +
+  225/  153 : 32 07 E0                  		ld	(led_timer), a
+  226/  156 : 18 0F                     		jr	.end
+  227/  158 : 3E 32                     +		ld	a, 50
+  228/  15A : 32 07 E0                  		ld	(led_timer), a
+  229/  15D : 3A 06 E0                  		ld	a, (led_state)
+  230/  160 : EE 80                     		xor	80h
+  231/  162 : D3 00                     		out	(fp_led_io), a
+  232/  164 : 32 06 E0                  		ld	(led_state), a
+  233/  167 :                           
+  234/  167 : D9                        .end		exx
+  235/  168 : 08                        		ex	af, af'
+  236/  169 : FB                        		ei
+  237/  16A : ED 4D                     		reti
+  238/  16C :                           
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 5 - 16.02.2026 10:22:44
+
+
+  239/  16C :                           asci_isr:
+  240/  16C : F3                        		di
+  241/  16D : 08                        		ex	af, af'
+  242/  16E : D9                        		exx
+  243/  16F :                           
+  244/  16F : ED 38 85                  		in0	a, (z180_stat1)
+  245/  172 : CB 7F                     		bit	7, a
+  246/  174 :                           		; call	nz, asci1_rx_available
+  247/  174 :                           
+  248/  174 : ED 38 85                  		in0	a, (z180_stat1)
+  249/  177 : CB 4F                     		bit	1, a
+  250/  179 :                           		; call	nz, asci1_tx_empty
+  251/  179 :                           
+  252/  179 :                           		; Reset error flags
+  253/  179 : ED 38 81                  		in0	a, (z180_cntla1)
+  254/  17C : CB 9F                     		res	3, a
+  255/  17E : ED 39 81                  		out0	(z180_cntla1), a
+  256/  181 :                           
+  257/  181 : D9                        		exx
+  258/  182 : 08                        		ex	af, af'
+  259/  183 : FB                        		ei
+  260/  184 : ED 4D                     		reti
+  261/  186 :                           
+  262/  186 :                           
+  263/  186 :                           isr_init:
+  264/  186 : 3E DF                     		ld	a, isr_page >> 8
+  265/  188 : ED 47                     		ld	i, a
+  266/  18A : 21 BF 00                  		ld	hl, z180_isr_table
+  267/  18D : 11 00 DF                  		ld	de, isr_page
+  268/  190 : 01 12 00                  		ld	bc, ei_reti - z180_isr_table
+  269/  193 : ED B0                     		ldir
+  270/  195 :                           
+  271/  195 :                           		; z180 prescales the counter by 20 so,
+  272/  195 :                           		; rldr = cpu clk / 20 / tickfreq
+  273/  195 :                           		; if we assume tickfreq = 50, we can simplify to
+  274/  195 :                           		; rldr = cpu clk / 1000
+  275/  195 :                           		; if we divide both sides by 1000, we can use
+  276/  195 :                           		; cpukhz value and simplify to
+  277/  195 :                           		; rldr = cpukhz
+  278/  195 : AF                        		xor	a			; all bits zero
+  279/  196 : ED 39 90                  		out0	(z180_tcr),a		; ... inhibits timer operation
+  280/  199 : ED 39 B4                  		out0	(z180_itc), a		; disable external interrupts
+  281/  19C :                           						; Enable trap vectoring to 0 for illegal instruction
+  282/  19C : 21 00 24                  		ld	hl, 02400h		; 50hz = 18432000 / 20 / 50 / x, so x = cpu khz
+  283/  19F : ED 29 94                  		out0	(z180_tmdr1l),l		; initialize timer 0 data register
+  284/  1A2 : ED 21 95                  		out0	(z180_tmdr1h),h
+  285/  1A5 : 2B                        		dec	hl			; reload occurs *after* zero
+  286/  1A6 : ED 29 96                  		out0	(z180_rldr1l),l		; initialize timer 0 reload register
+  287/  1A9 : ED 21 97                  		out0	(z180_rldr1h),h
+  288/  1AC : 3E 22                     		ld	a, 022h			; enable timer0 int and down counting
+  289/  1AE : ED 39 90                  		out0	(z180_tcr),a
+  290/  1B1 : ED 5E                     		im	2
+  291/  1B3 : FB                        		ei
+  292/  1B4 :                           
+  293/  1B4 :                           
+  294/  1B4 :                           ;
+  295/  1B4 :                           ; Fill the screen with background color
+  296/  1B4 :                           ;
+  297/  1B4 : F5                        TFT_CLEAR:	PUSH	AF
+  298/  1B5 : C5                        		PUSH	BC
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 6 - 16.02.2026 10:22:44
+
+
+  299/  1B6 : D5                        		PUSH	DE
+  300/  1B7 : E5                        		PUSH	HL
+  301/  1B8 : 3E 2A                     		LD	A, TFT_CASET		; Column address set
+  302/  1BA : D3 54                     		OUT	(TFT_CMD), A
+  303/  1BC : 3E 00                     		LD 	A, 0
+  304/  1BE : D3 55                     		OUT	(TFT_DATA), A
+  305/  1C0 : D3 55                     		OUT	(TFT_DATA), A
+  306/  1C2 : 3E 00                     		LD	A, (TFT_COLS - 1) >> 8
+  307/  1C4 : D3 55                     		OUT	(TFT_DATA), A
+  308/  1C6 : 3E 9F                     		LD	A, (TFT_COLS - 1) & 0xFF
+  309/  1C8 : D3 55                     		OUT	(TFT_DATA), A
+  310/  1CA :                           
+  311/  1CA : 3E 2B                     		LD	A, TFT_RASET		; Row address set
+  312/  1CC : D3 54                     		OUT	(TFT_CMD), A
+  313/  1CE : 3E 00                     		LD	A, 0
+  314/  1D0 : D3 55                     		OUT	(TFT_DATA), A
+  315/  1D2 : D3 55                     		OUT	(TFT_DATA), A
+  316/  1D4 : 3E 80                     		LD	A, TFT_ROWS - 1 >> 8
+  317/  1D6 : D3 55                     		OUT	(TFT_DATA), A
+  318/  1D8 : 3E 7F                     		LD	A, TFT_ROWS - 1 & 0xFF
+  319/  1DA : D3 55                     		OUT	(TFT_DATA), A
+  320/  1DC : 3E 2C                     		LD	A, TFT_RAMWR		; Write data
+  321/  1DE : D3 54                     		OUT	(TFT_CMD), A
+  322/  1E0 : ED 5B 0A E0               		LD	DE, (TFT_BG)
+  323/  1E4 : 0E 55                     		LD	C, TFT_DATA
+  324/  1E6 : 21 00 0A                  		LD	HL, TFT_ROWS * TFT_COLS / 8
+  325/  1E9 :                           .loop:		REPT	8			; Write 8 pixels per loop
+  326/  1E9 :                           		OUT	(C), D
+  327/  1E9 :                           		OUT	(C), E
+  328/  1E9 :                           		ENDM
+  326/  1E9 : ED 51                     		OUT	(C), D
+  327/  1EB : ED 59                     		OUT	(C), E
+  326/  1ED : ED 51                     		OUT	(C), D
+  327/  1EF : ED 59                     		OUT	(C), E
+  326/  1F1 : ED 51                     		OUT	(C), D
+  327/  1F3 : ED 59                     		OUT	(C), E
+  326/  1F5 : ED 51                     		OUT	(C), D
+  327/  1F7 : ED 59                     		OUT	(C), E
+  326/  1F9 : ED 51                     		OUT	(C), D
+  327/  1FB : ED 59                     		OUT	(C), E
+  326/  1FD : ED 51                     		OUT	(C), D
+  327/  1FF : ED 59                     		OUT	(C), E
+  326/  201 : ED 51                     		OUT	(C), D
+  327/  203 : ED 59                     		OUT	(C), E
+  326/  205 : ED 51                     		OUT	(C), D
+  327/  207 : ED 59                     		OUT	(C), E
+  329/  209 : 2B                        		DEC	HL
+  330/  20A : 7C                        		LD	A, H
+  331/  20B : B5                        		OR	L
+  332/  20C : 20 DB                     		JR	NZ, .loop
+  333/  20E : AF                        		xor	a
+  334/  20F : 32 04 E0                  		ld	(tft_row), a
+  335/  212 : 32 05 E0                  		ld	(tft_col), a
+  336/  215 : E1                        		POP	HL
+  337/  216 : D1                        		POP	DE
+  338/  217 : C1                        		POP	BC
+  339/  218 : F1                        		POP	AF
+  340/  219 : C9                        		RET
+  341/  21A :                           
+  342/  21A :                           ;
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 7 - 16.02.2026 10:22:44
+
+
+  343/  21A :                           ; Scroll down by one line
+  344/  21A :                           ;
+  345/  21A : F5                        TFT_SCROLL:	PUSH	AF
+  346/  21B : C5                        		PUSH	BC
+  347/  21C : D5                        		PUSH	DE
+  348/  21D : E5                        		PUSH	HL
+  349/  21E : ED 73 08 E0               		LD	(TFT_STACK), SP		; Allocate TFT_ROWS x 3 bytes on the stack
+  350/  222 : 2A 08 E0                  		LD	HL, (TFT_STACK)
+  351/  225 : 11 E0 01                  		LD	DE, TFT_COLS * 3
+  352/  228 : B7                        		OR	A
+  353/  229 : ED 52                     		SBC	HL, DE
+  354/  22B : F9                        		LD	SP, HL
+  355/  22C : 3E 3A                     		LD	A, TFT_COLMOD		; Set the TFT to 888 color mode
+  356/  22E : D3 54                     		OUT	(TFT_CMD), A
+  357/  230 : 3E 66                     		LD	A, TFT_888
+  358/  232 : D3 55                     		OUT	(TFT_DATA), A
+  359/  234 : 3E 2A                     		LD	A, TFT_CASET		; Set column address for whole row
+  360/  236 : D3 54                     		OUT	(TFT_CMD), A
+  361/  238 : AF                        		XOR	A
+  362/  239 : D3 55                     		OUT	(TFT_DATA), A
+  363/  23B : D3 55                     		OUT	(TFT_DATA), A
+  364/  23D : 3E 00                     		LD	A, (TFT_COLS - 1) >> 8
+  365/  23F : D3 55                     		OUT	(TFT_DATA), A
+  366/  241 : 3E 9F                     		LD	A, (TFT_COLS - 1) & 0xFF
+  367/  243 : D3 55                     		OUT	(TFT_DATA), A
+  368/  245 : 0E 55                     		LD	C, TFT_DATA		; Use C for TFT_DATA port address pointer
+  369/  247 : 11 00 00                  		LD	DE, 0			; DE contains target row
+  370/  24A : E5                        .loop:		PUSH	HL			; Stack buffer start...
+  371/  24B : D5                        		PUSH	DE			; Save the target row
+  372/  24C : 7B                        		LD	A, E
+  373/  24D : C6 08                     		ADD	A, 8
+  374/  24F : 5F                        		LD	E, A
+  375/  250 : 30 01                     		JR	NC, +
+  376/  252 : 14                        		INC	D			; DE contains start row + 8, the source row
+  377/  253 : CD 07 03                  +		CALL	TFT_SCROLL_RASET	; Set read row address
+  378/  256 : 3E 2E                     +		LD	A, TFT_RAMRD		; TFT command for ram read
+  379/  258 : D3 54                     		OUT	(TFT_CMD), A
+  380/  25A : DB 55                     		IN	A, (TFT_DATA)		; Dummy read, for TFT internal setup
+  381/  25C :                           
+  382/  25C : D1                        		POP	DE
+  383/  25D : E1                        		POP	HL
+  384/  25E :                           ;		CALL	DMA_IO_TO_MEM
+  385/  25E :                           
+  386/  25E : 1E 28                     		LD	E, TFT_COLS / 4		; Loop reads 4 pixels at a time, this supports up to 1024 wide screens
+  387/  260 :                           .read_loop:	REPT	3 * 4			; 3 bytes per pixel, 4 pixels
+  388/  260 :                           		INI
+  389/  260 :                           		ENDM
+  388/  260 : ED A2                     		INI
+  388/  262 : ED A2                     		INI
+  388/  264 : ED A2                     		INI
+  388/  266 : ED A2                     		INI
+  388/  268 : ED A2                     		INI
+  388/  26A : ED A2                     		INI
+  388/  26C : ED A2                     		INI
+  388/  26E : ED A2                     		INI
+  388/  270 : ED A2                     		INI
+  388/  272 : ED A2                     		INI
+  388/  274 : ED A2                     		INI
+  388/  276 : ED A2                     		INI
+  390/  278 : 1D                        		DEC	E
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 8 - 16.02.2026 10:22:44
+
+
+  391/  279 : 20 E5                     		JR	NZ, .read_loop		; Cant use B as INI will mangle it
+  392/  27B :                           
+  393/  27B : D1                        		POP	DE			; Restore the write address
+  394/  27C : CD 07 03                  		CALL	TFT_SCROLL_RASET	; Set write row address
+  395/  27F : 3E 2C                     		LD	A, TFT_RAMWR		; TFT command for ram write
+  396/  281 : D3 54                     		OUT	(TFT_CMD), A
+  397/  283 : E1                        		POP	HL			; Get stack buffer start
+  398/  284 : E5                        		PUSH	HL
+  399/  285 : D5                        		PUSH	DE			; Save row counter
+  400/  286 :                           
+  401/  286 :                           ;		CALL	DMA_MEM_TO_IO
+  402/  286 :                           
+  403/  286 :                           
+  404/  286 : 1E 28                     		LD	E, TFT_COLS / 4		; Loop writes 4 pixels at a time, this supports up to 1024 wide screens
+  405/  288 :                           .write_loop:	REPT	3 * 4			; 3 bytes per pixel, 4 pixels
+  406/  288 :                           		OUTI
+  407/  288 :                           		ENDM
+  406/  288 : ED A3                     		OUTI
+  406/  28A : ED A3                     		OUTI
+  406/  28C : ED A3                     		OUTI
+  406/  28E : ED A3                     		OUTI
+  406/  290 : ED A3                     		OUTI
+  406/  292 : ED A3                     		OUTI
+  406/  294 : ED A3                     		OUTI
+  406/  296 : ED A3                     		OUTI
+  406/  298 : ED A3                     		OUTI
+  406/  29A : ED A3                     		OUTI
+  406/  29C : ED A3                     		OUTI
+  406/  29E : ED A3                     		OUTI
+  408/  2A0 : 1D                        		DEC	E
+  409/  2A1 : 20 E5                     		JR	NZ, .write_loop
+  410/  2A3 :                           
+  411/  2A3 : D1                        		POP	DE			; Restore row address
+  412/  2A4 : E1                        		POP	HL			; Restore stack buffer
+  413/  2A5 : 13                        		INC	DE			; Next row
+  414/  2A6 : 7A                        		LD	A, D			; Check for TFT_ROWS - 8
+  415/  2A7 : FE 00                     		CP	(TFT_ROWS - 8) >> 8
+  416/  2A9 : 20 9F                     		JR	NZ, .loop
+  417/  2AB : 7B                        		LD	A, E
+  418/  2AC : FE 78                     		CP	(TFT_ROWS - 8) & 0xFF
+  419/  2AE : 20 9A                     		JR	NZ, .loop
+  420/  2B0 : ED 7B 08 E0               		LD	SP, (TFT_STACK)		; End of scroll loop, restore stack
+  421/  2B4 : 3E 2B                     		LD	A, TFT_RASET		; Set write area to last 8 rows
+  422/  2B6 : D3 54                     		OUT	(TFT_CMD), A
+  423/  2B8 : 3E 80                     		LD	A, TFT_ROWS - 8 >> 8
+  424/  2BA : D3 55                     		OUT	(TFT_DATA), A
+  425/  2BC : 3E 78                     		LD	A, TFT_ROWS - 8 & 0xFF
+  426/  2BE : D3 55                     		OUT	(TFT_DATA), A
+  427/  2C0 : 3E 80                     		LD	A, TFT_ROWS - 1 >> 8
+  428/  2C2 : D3 55                     		OUT	(TFT_DATA), A
+  429/  2C4 : 3E 7F                     		LD	A, TFT_ROWS - 1 & 0xFF
+  430/  2C6 : D3 55                     		OUT	(TFT_DATA), A
+  431/  2C8 : 3E 3A                     		LD	A, TFT_COLMOD		; Restore the color mode
+  432/  2CA : D3 54                     		OUT	(TFT_CMD), A
+  433/  2CC : 3E 55                     		LD	A, TFT_565
+  434/  2CE : D3 55                     		OUT	(TFT_DATA), A
+  435/  2D0 : 3E 2C                     		LD	A, TFT_RAMWR
+  436/  2D2 : D3 54                     		OUT	(TFT_CMD), A
+  437/  2D4 : 21 A0 00                  		LD	HL, TFT_COLS		; Fill the last 8 rows with BG color
+  438/  2D7 : 0E 55                     		LD	C, TFT_DATA
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 9 - 16.02.2026 10:22:44
+
+
+  439/  2D9 : ED 5B 0A E0               		LD	DE, (TFT_BG)
+  440/  2DD :                           .fill_loop:	REPT	8			; Output 8 pixels per loop iteration
+  441/  2DD :                           		OUT	(C), D
+  442/  2DD :                           		OUT	(C), E
+  443/  2DD :                           		ENDM
+  441/  2DD : ED 51                     		OUT	(C), D
+  442/  2DF : ED 59                     		OUT	(C), E
+  441/  2E1 : ED 51                     		OUT	(C), D
+  442/  2E3 : ED 59                     		OUT	(C), E
+  441/  2E5 : ED 51                     		OUT	(C), D
+  442/  2E7 : ED 59                     		OUT	(C), E
+  441/  2E9 : ED 51                     		OUT	(C), D
+  442/  2EB : ED 59                     		OUT	(C), E
+  441/  2ED : ED 51                     		OUT	(C), D
+  442/  2EF : ED 59                     		OUT	(C), E
+  441/  2F1 : ED 51                     		OUT	(C), D
+  442/  2F3 : ED 59                     		OUT	(C), E
+  441/  2F5 : ED 51                     		OUT	(C), D
+  442/  2F7 : ED 59                     		OUT	(C), E
+  441/  2F9 : ED 51                     		OUT	(C), D
+  442/  2FB : ED 59                     		OUT	(C), E
+  444/  2FD : 2B                        		DEC	HL
+  445/  2FE : 7C                        		LD	A, H
+  446/  2FF : B5                        		OR	L
+  447/  300 : 20 DB                     		JR	NZ, .fill_loop
+  448/  302 : E1                        		POP	HL
+  449/  303 : D1                        		POP	DE
+  450/  304 : C1                        		POP	BC
+  451/  305 : F1                        		POP	AF
+  452/  306 : C9                        		RET
+  453/  307 :                           
+  454/  307 :                           
+  455/  307 :                           TFT_SCROLL_RASET:
+  456/  307 : 3E 2B                     		LD	A, TFT_RASET
+  457/  309 : D3 54                     		OUT	(TFT_CMD), A
+  458/  30B : ED 51                     		OUT	(C), D
+  459/  30D : ED 59                     		OUT	(C), E
+  460/  30F : ED 51                     		OUT	(C), D
+  461/  311 : ED 59                     		OUT	(C), E
+  462/  313 : C9                        		RET
+  463/  314 :                           
+  464/  314 : F5                        TFT_SET_FG:	PUSH	AF
+  465/  315 : C5                        		PUSH	BC
+  466/  316 : E5                        		PUSH	HL
+  467/  317 : 21 E0 05                  		LD	HL, TFT_PALETTE
+  468/  31A : E6 0F                     		AND	0x0F
+  469/  31C : CB 27                     		SLA	A
+  470/  31E : 85                        		ADD	A, L
+  471/  31F : 6F                        		LD	L, A
+  472/  320 : 4E                        		LD	C, (HL)
+  473/  321 : 23                        		INC	HL
+  474/  322 : 46                        		LD	B, (HL)
+  475/  323 : 21 0C E0                  		LD	HL, TFT_FG
+  476/  326 : 71                        		LD	(HL), C
+  477/  327 : 23                        		INC	HL
+  478/  328 : 70                        		LD	(HL), B
+  479/  329 : E1                        		POP	HL
+  480/  32A : C1                        		POP	BC
+  481/  32B : F1                        		POP	AF
+  482/  32C : C9                        		RET
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 10 - 16.02.2026 10:22:44
+
+
+  483/  32D :                           
+  484/  32D : F5                        TFT_SET_BG:	PUSH	AF
+  485/  32E : C5                        		PUSH	BC
+  486/  32F : E5                        		PUSH	HL
+  487/  330 : 21 E0 05                  		LD	HL, TFT_PALETTE
+  488/  333 : E6 0F                     		AND	0x0F
+  489/  335 : CB 27                     		SLA	A
+  490/  337 : 85                        		ADD	A, L
+  491/  338 : 6F                        		LD	L, A
+  492/  339 : 4E                        		LD	C, (HL)
+  493/  33A : 23                        		INC	HL
+  494/  33B : 46                        		LD	B, (HL)
+  495/  33C : 21 0A E0                  		LD	HL, TFT_BG
+  496/  33F : 71                        		LD	(HL), C
+  497/  340 : 23                        		INC	HL
+  498/  341 : 70                        		LD	(HL), B
+  499/  342 : E1                        		POP	HL
+  500/  343 : C1                        		POP	BC
+  501/  344 : F1                        		POP	AF
+  502/  345 : C9                        		RET
+  503/  346 :                           
+  504/  346 :                           
+  505/  346 :                           TFT_PRINT:
+  506/  346 : C5                        		push	bc
+  507/  347 : F5                        		push 	af
+  508/  348 : FE 0D                     		cp	"\r"
+  509/  34A : 28 34                     		jr	z, .cr
+  510/  34C : FE 0A                     		cp	"\n"
+  511/  34E : 28 13                     		jr	z, .nl
+  512/  350 : 3A 05 E0                  		ld	a, (tft_col)
+  513/  353 : 47                        		ld	b, a
+  514/  354 : 3A 04 E0                  		ld	a, (tft_row)
+  515/  357 : 4F                        		ld	c, a
+  516/  358 : F1                        		pop	af
+  517/  359 : CD 83 03                  		call	TFT_PUTC
+  518/  35C : F5                        		push	af
+  519/  35D : 04                        		inc	b
+  520/  35E : 78                        		ld 	a, b
+  521/  35F : FE 14                     		cp	TFT_COLS / 8
+  522/  361 : 20 17                     		jr	nz, .next_col	; just increment column
+  523/  363 : AF                        .nl		xor	a
+  524/  364 : 32 05 E0                  		ld	(tft_col), a
+  525/  367 : 3A 04 E0                  		ld	a, (tft_row)
+  526/  36A : 3C                        		inc	a
+  527/  36B : FE 10                     		cp	TFT_ROWS / 8
+  528/  36D : 20 06                     		jr	nz, .next_row
+  529/  36F : AF                        		xor	a
+  530/  370 : 32 04 E0                  		ld	(tft_row), a
+  531/  373 : 18 08                     		jr	.end
+  532/  375 :                           .next_row
+  533/  375 : 32 04 E0                  		ld	(tft_row), a
+  534/  378 : 18 03                     		jr	.end
+  535/  37A :                           
+  536/  37A : 32 05 E0                  .next_col	ld	(tft_col), a
+  537/  37D : F1                        .end		pop	af
+  538/  37E : C1                        		pop	bc
+  539/  37F : C9                        		ret
+  540/  380 : AF                        .cr		xor	a
+  541/  381 : 18 F7                     		jr	.next_col
+  542/  383 :                           
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 11 - 16.02.2026 10:22:44
+
+
+  543/  383 :                           		; B = col, C = row
+  544/  383 :                           		; A = character
+  545/  383 : F5                        TFT_PUTC:	PUSH	AF
+  546/  384 : C5                        		PUSH	BC
+  547/  385 : D5                        		PUSH	DE
+  548/  386 : E5                        		PUSH	HL
+  549/  387 : CD 21 04                  		CALL	TFT_SET_POS
+  550/  38A : CD 5A 04                  		CALL	TFT_GETGLYPH
+  551/  38D : 3E 2C                     		LD	A, TFT_RAMWR
+  552/  38F : D3 54                     		OUT	(TFT_CMD), A
+  553/  391 : 0E 55                     		LD	C, TFT_DATA
+  554/  393 : 06 08                     		LD	B, 8
+  555/  395 : ED 5B 0A E0               		LD	DE, (TFT_BG)
+  556/  399 : 7E                        .loop:		LD	A, (HL)
+  557/  39A : 23                        		INC	HL
+  558/  39B : E5                        		PUSH	HL
+  559/  39C : 2A 0C E0                  		LD	HL, (TFT_FG)
+  560/  39F :                           		REPT	8
+  561/  39F :                           		RLCA			; Rotate A left to carry fast
+  562/  39F :                           		JR	C, +
+  563/  39F :                           		OUT	(C), D		; DE contains the background color
+  564/  39F :                           		OUT	(C), E
+  565/  39F :                           		JR	++
+  566/  39F :                           +		OUT	(C), H		; HL contains the foreground color
+  567/  39F :                           		OUT	(C), L
+  568/  39F :                           +
+  569/  39F :                           		ENDM
+  561/  39F : 07                        		RLCA			; Rotate A left to carry fast
+  562/  3A0 : 38 06                     		JR	C, +
+  563/  3A2 : ED 51                     		OUT	(C), D		; DE contains the background color
+  564/  3A4 : ED 59                     		OUT	(C), E
+  565/  3A6 : 18 04                     		JR	++
+  566/  3A8 : ED 61                     +		OUT	(C), H		; HL contains the foreground color
+  567/  3AA : ED 69                     		OUT	(C), L
+  568/  3AC :                           +
+  561/  3AC : 07                        		RLCA			; Rotate A left to carry fast
+  562/  3AD : 38 06                     		JR	C, +
+  563/  3AF : ED 51                     		OUT	(C), D		; DE contains the background color
+  564/  3B1 : ED 59                     		OUT	(C), E
+  565/  3B3 : 18 04                     		JR	++
+  566/  3B5 : ED 61                     +		OUT	(C), H		; HL contains the foreground color
+  567/  3B7 : ED 69                     		OUT	(C), L
+  568/  3B9 :                           +
+  561/  3B9 : 07                        		RLCA			; Rotate A left to carry fast
+  562/  3BA : 38 06                     		JR	C, +
+  563/  3BC : ED 51                     		OUT	(C), D		; DE contains the background color
+  564/  3BE : ED 59                     		OUT	(C), E
+  565/  3C0 : 18 04                     		JR	++
+  566/  3C2 : ED 61                     +		OUT	(C), H		; HL contains the foreground color
+  567/  3C4 : ED 69                     		OUT	(C), L
+  568/  3C6 :                           +
+  561/  3C6 : 07                        		RLCA			; Rotate A left to carry fast
+  562/  3C7 : 38 06                     		JR	C, +
+  563/  3C9 : ED 51                     		OUT	(C), D		; DE contains the background color
+  564/  3CB : ED 59                     		OUT	(C), E
+  565/  3CD : 18 04                     		JR	++
+  566/  3CF : ED 61                     +		OUT	(C), H		; HL contains the foreground color
+  567/  3D1 : ED 69                     		OUT	(C), L
+  568/  3D3 :                           +
+  561/  3D3 : 07                        		RLCA			; Rotate A left to carry fast
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 12 - 16.02.2026 10:22:44
+
+
+  562/  3D4 : 38 06                     		JR	C, +
+  563/  3D6 : ED 51                     		OUT	(C), D		; DE contains the background color
+  564/  3D8 : ED 59                     		OUT	(C), E
+  565/  3DA : 18 04                     		JR	++
+  566/  3DC : ED 61                     +		OUT	(C), H		; HL contains the foreground color
+  567/  3DE : ED 69                     		OUT	(C), L
+  568/  3E0 :                           +
+  561/  3E0 : 07                        		RLCA			; Rotate A left to carry fast
+  562/  3E1 : 38 06                     		JR	C, +
+  563/  3E3 : ED 51                     		OUT	(C), D		; DE contains the background color
+  564/  3E5 : ED 59                     		OUT	(C), E
+  565/  3E7 : 18 04                     		JR	++
+  566/  3E9 : ED 61                     +		OUT	(C), H		; HL contains the foreground color
+  567/  3EB : ED 69                     		OUT	(C), L
+  568/  3ED :                           +
+  561/  3ED : 07                        		RLCA			; Rotate A left to carry fast
+  562/  3EE : 38 06                     		JR	C, +
+  563/  3F0 : ED 51                     		OUT	(C), D		; DE contains the background color
+  564/  3F2 : ED 59                     		OUT	(C), E
+  565/  3F4 : 18 04                     		JR	++
+  566/  3F6 : ED 61                     +		OUT	(C), H		; HL contains the foreground color
+  567/  3F8 : ED 69                     		OUT	(C), L
+  568/  3FA :                           +
+  561/  3FA : 07                        		RLCA			; Rotate A left to carry fast
+  562/  3FB : 38 06                     		JR	C, +
+  563/  3FD : ED 51                     		OUT	(C), D		; DE contains the background color
+  564/  3FF : ED 59                     		OUT	(C), E
+  565/  401 : 18 04                     		JR	++
+  566/  403 : ED 61                     +		OUT	(C), H		; HL contains the foreground color
+  567/  405 : ED 69                     		OUT	(C), L
+  568/  407 :                           +
+  570/  407 : E1                        		POP	HL
+  571/  408 : 05                        		DEC	B
+  572/  409 : 28 03                     		JR	Z, .end
+  573/  40B : C3 99 03                  		JP	.loop
+  574/  40E : E1                        .end:		POP	HL
+  575/  40F : D1                        		POP	DE
+  576/  410 : C1                        		POP	BC
+  577/  411 : F1                        		POP	AF
+  578/  412 : C9                        		RET
+  579/  413 :                           
+  580/  413 : 3E 00                     TFT_DRAW_FG:	LD	A, 0
+  581/  415 : D3 55                     		OUT	(TFT_DATA), A
+  582/  417 : D3 55                     		OUT	(TFT_DATA), A
+  583/  419 : C9                        		RET
+  584/  41A :                           
+  585/  41A : 3E 00                     TFT_DRAW_BG:	LD	A, 0
+  586/  41C : D3 55                     		OUT	(TFT_DATA), A
+  587/  41E : D3 55                     		OUT	(TFT_DATA), A
+  588/  420 : C9                        		RET
+  589/  421 :                           
+  590/  421 :                           
+  591/  421 :                           ;
+  592/  421 :                           ; Set write area to given glyph
+  593/  421 :                           ; B colums, C rows
+  594/  421 :                           ;
+  595/  421 : F5                        TFT_SET_POS:	PUSH	AF
+  596/  422 : D5                        		PUSH	DE
+  597/  423 : 16 00                     		LD	D, 0
+  598/  425 : 58                        		LD	E, B
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 13 - 16.02.2026 10:22:44
+
+
+  599/  426 : 3E 2A                     		LD	A, TFT_CASET
+  600/  428 : D3 54                     		OUT	(TFT_CMD), A
+  601/  42A : CD 3A 04                  		CALL	TFT_SET_REGION
+  602/  42D : 16 00                     		LD	D, 0
+  603/  42F : 59                        		LD	E, C
+  604/  430 : 3E 2B                     		LD	A, TFT_RASET
+  605/  432 : D3 54                     		OUT	(TFT_CMD), A
+  606/  434 : CD 3A 04                  		CALL	TFT_SET_REGION
+  607/  437 : D1                        		POP	DE
+  608/  438 : F1                        		POP	AF
+  609/  439 : C9                        		RET
+  610/  43A :                           
+  611/  43A :                           
+  612/  43A : CB 23                     TFT_SET_REGION:	SLA	E			; Multiply by 8
+  613/  43C : CB 12                     		RL	D
+  614/  43E : CB 23                     		SLA	E
+  615/  440 : CB 12                     		RL	D
+  616/  442 : CB 23                     		SLA	E
+  617/  444 : CB 12                     		RL	D
+  618/  446 : 7A                        		LD	A, D
+  619/  447 : D3 55                     		OUT	(TFT_DATA), A
+  620/  449 : 7B                        		LD	A, E
+  621/  44A : D3 55                     		OUT	(TFT_DATA), A
+  622/  44C : 3E 07                     		LD	A, 7
+  623/  44E : 83                        		ADD	A, E
+  624/  44F : 30 01                     		JR	NC, +
+  625/  451 : 14                        		INC	D
+  626/  452 : 5F                        +		LD	E, A
+  627/  453 : 7A                        		LD	A, D
+  628/  454 : D3 55                     		OUT	(TFT_DATA), A
+  629/  456 : 7B                        		LD	A, E
+  630/  457 : D3 55                     		OUT	(TFT_DATA), A
+  631/  459 : C9                        		RET
+  632/  45A :                           
+  633/  45A :                           
+  634/  45A :                           ;
+  635/  45A :                           ; Get pointer to font glyph
+  636/  45A :                           ; A - character
+  637/  45A :                           ; Returns the pointer in HL
+  638/  45A :                           ;
+  639/  45A : C5                        TFT_GETGLYPH:	PUSH	BC
+  640/  45B : 06 00                     		LD	B, 0
+  641/  45D : 4F                        		LD	C, A
+  642/  45E : CB 21                     		SLA	C			; Multiply by 8
+  643/  460 : CB 10                     		RL	B
+  644/  462 : CB 21                     		SLA	C
+  645/  464 : CB 10                     		RL	B
+  646/  466 : CB 21                     		SLA	C
+  647/  468 : CB 10                     		RL	B
+  648/  46A : 21 35 70                  		LD	HL, FONT8x8U
+  649/  46D : 09                        		ADD	HL, BC
+  650/  46E : C1                        		POP	BC
+  651/  46F : C9                        		RET
+  652/  470 :                           
+  653/  470 :                           		; TODO: SW reset with 120 msec delay...
+  654/  470 : 3E 3A                     TFT_INIT:	LD	A, TFT_COLMOD		; data format
+  655/  472 : D3 54                     		OUT	(TFT_CMD), A
+  656/  474 : 3E 55                     		LD	A, TFT_565		; 5-6-5
+  657/  476 : D3 55                     		OUT	(TFT_DATA), A
+  658/  478 : 3E 36                     		LD	A, TFT_MADCTL		; Screen rotation
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 14 - 16.02.2026 10:22:44
+
+
+  659/  47A : D3 54                     		OUT	(TFT_CMD), A
+  660/  47C : 3E A8                     		LD	A, TFT_MADCTL_VAL
+  661/  47E : D3 55                     		OUT	(TFT_DATA), A
+  662/  480 : 3E 20                     		LD	A, TFT_INVOFF		; no invert
+  663/  482 : D3 54                     		OUT	(TFT_CMD), A
+  664/  484 : 3E 26                     		LD	A, TFT_GAMSET		; Gamma
+  665/  486 : D3 54                     		OUT	(TFT_CMD), A
+  666/  488 : 3E 02                     		LD	A, TFT_GAMMA
+  667/  48A : D3 55                     		OUT	(TFT_DATA), A
+  668/  48C : 3E 11                     		LD	A, TFT_SLPOUT		; Sleep out
+  669/  48E : D3 54                     		OUT	(TFT_CMD), A
+  670/  490 :                           
+  671/  490 : 3E 29                     		LD	A, TFT_DISPON		; Display on
+  672/  492 : D3 54                     		OUT	(TFT_CMD), A
+  673/  494 :                           
+  674/  494 : C9                        		RET
+  675/  495 :                           
+  676/  495 :                           
+  677/  495 :                           		include "io.asm"
+(1)    1/  495 :                        ;
+(1)    2/  495 :                        ; Initialize Z180 ASCI
+(1)    3/  495 :                        ;
+(1)    4/  495 :                        uart_init:
+(1)    5/  495 :                        		;
+(1)    6/  495 :                        		; Program the ASCI0 port
+(1)    7/  495 :                        		;
+(1)    8/  495 :                        		; CNTLB is programmed to achieve a divisor of CPU clock / 480.  For
+(1)    9/  495 :                        		; a CPU with an 18.432 MHz clock running at half speed as programmed
+(1)   10/  495 :                        		; above, this will be 9216000 / 480 = 19200 baud.
+(1)   11/  495 :                        		;
+(1)   12/  495 : 3E 00                  		ld	a, 0
+(1)   13/  497 : ED 39 84               		out0	(z180_stat0), a		; disable interrupts, ch0
+(1)   14/  49A : ED 39 85               		out0	(z180_stat1), a		; disable interrupts, ch1
+(1)   15/  49D :                        
+(1)   16/  49D : 3E 64                  		ld	a, 64h			; xmit enable, rcv enable, 8 data bits, no parity
+(1)   17/  49F : ED 39 81               		out0	(z180_cntla1), a
+(1)   18/  4A2 : ED 39 80               		out0	(z180_cntla0), a
+(1)   19/  4A5 :                        
+(1)   20/  4A5 : 3E 00                  		ld	a, 0h			; Set both as 57600-8-N-1
+(1)   21/  4A7 : ED 39 82               		out0	(z180_cntlb0), a
+(1)   22/  4AA : ED 39 83               		out0	(z180_cntlb1), a
+(1)   23/  4AD : 3E 00                  		ld	a,
+(1)   24/  4AF :                        
+(1)   25/  4AF : 3E 60                  		ld	a, 60h			; dcd0 disable, cts0 disable
+(1)   26/  4B1 : ED 39 92               		out0	(z180_asext0), a
+(1)   27/  4B4 : 3E 00                  		ld	a, 0h
+(1)   28/  4B6 : ED 39 93               		out0	(z180_asext1), a
+(1)   29/  4B9 :                        
+(1)   30/  4B9 : C9                     		ret
+(1)   31/  4BA :                        
+(1)   32/  4BA :                        ;
+(1)   33/  4BA :                        ; Routine to print a string at HL to chan1
+(1)   34/  4BA :                        ;
+(1)   35/  4BA : 7E                     puts1:		ld	a, (hl)
+(1)   36/  4BB : B7                     		or	a
+(1)   37/  4BC : C8                     		ret	z
+(1)   38/  4BD : CD EE 04               		call	putc1
+(1)   39/  4C0 : 23                     		inc	hl
+(1)   40/  4C1 : 18 F7                  		jr	puts1
+(1)   41/  4C3 :                        
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm(io.asm) - Page 15 - 16.02.2026 10:22:44
+
+
+(1)   42/  4C3 : 7E                     puts0:		ld	a, (hl)
+(1)   43/  4C4 : B7                     		or	a
+(1)   44/  4C5 : C8                     		ret	z
+(1)   45/  4C6 : CD E1 04               		call	putc0
+(1)   46/  4C9 : 23                     		inc	hl
+(1)   47/  4CA : 18 F7                  		jr	puts0
+(1)   48/  4CC :                        
+(1)   49/  4CC :                        
+(1)   50/  4CC : 7E                     puts_tft:	ld	a, (hl)
+(1)   51/  4CD : B7                     		or	a
+(1)   52/  4CE : C8                     		ret	z
+(1)   53/  4CF : CD 46 03               		call	tft_print
+(1)   54/  4D2 : 23                     		inc	hl
+(1)   55/  4D3 : 18 F7                  		jr	puts_tft
+(1)   56/  4D5 :                        
+(1)   57/  4D5 :                        
+(1)   58/  4D5 : E1                     puts1_im:	pop	hl
+(1)   59/  4D6 : CD BA 04               		call	puts1
+(1)   60/  4D9 : 23                     		inc	hl
+(1)   61/  4DA : E9                     		jp	(hl)
+(1)   62/  4DB :                        
+(1)   63/  4DB : E1                     puts0_im:	pop	hl
+(1)   64/  4DC : CD C3 04               		call	puts0
+(1)   65/  4DF : 23                     		inc	hl
+(1)   66/  4E0 : E9                     		jp	(hl)
+(1)   67/  4E1 :                        
+(1)   68/  4E1 :                        
+(1)   69/  4E1 : F5                     putc0:		push	af
+(1)   70/  4E2 : ED 38 84               .loop:		in0	a, (z180_stat0)
+(1)   71/  4E5 : E6 02                  		and	02h
+(1)   72/  4E7 : 28 F9                  		jr	z, .loop
+(1)   73/  4E9 : F1                     		pop	af
+(1)   74/  4EA : ED 39 86               		out0	(z180_tdr0), a
+(1)   75/  4ED : C9                     		ret
+(1)   76/  4EE :                        
+(1)   77/  4EE : F5                     putc1:		push	af
+(1)   78/  4EF : ED 38 85               .loop:		in0	a, (z180_stat1)
+(1)   79/  4F2 : E6 02                  		and	02h
+(1)   80/  4F4 : 28 F9                  		jr	z, .loop
+(1)   81/  4F6 : F1                     		pop	af
+(1)   82/  4F7 : ED 39 87               		out0	(z180_tdr1), a
+(1)   83/  4FA : C9                     		ret
+(1)   84/  4FB :                        
+(1)   85/  4FB :                        
+(1)   86/  4FB : ED 38 84               getc0:		in0	A, (z180_stat0)
+(1)   87/  4FE : CB 7F                  		bit	7, A
+(1)   88/  500 : 28 F9                  		jr	z, getc0
+(1)   89/  502 : ED 38 88               		in0	a, (z180_rdr0)
+(1)   90/  505 : C9                     		ret
+(1)   91/  506 :                        
+(1)   92/  506 :                        
+(1)   93/  506 : ED 38 85               getc1:		in0	A, (z180_stat1)
+(1)   94/  509 : CB 7F                  		bit	7, A
+(1)   95/  50B : 28 EE                  		jr	z, getc0
+(1)   96/  50D : ED 38 89               		in0	a, (z180_rdr1)
+(1)   97/  510 : C9                     		ret
+(1)   98/  511 :                        
+(1)   99/  511 :                        
+(1)  100/  511 :                        print_word:
+(1)  101/  511 : F5                     		push	af
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm(io.asm) - Page 16 - 16.02.2026 10:22:44
+
+
+(1)  102/  512 : 7C                     		ld	a, h
+(1)  103/  513 : CD 1C 05               		call	print_byte
+(1)  104/  516 : 7D                     		ld	a, l
+(1)  105/  517 : CD 1C 05               		call	print_byte
+(1)  106/  51A : F1                     		pop	af
+(1)  107/  51B : C9                     		ret
+(1)  108/  51C :                        
+(1)  109/  51C :                        
+(1)  110/  51C :                        print_byte:
+(1)  111/  51C : F5                     		push	af
+(1)  112/  51D : 1F                     		rra
+(1)  113/  51E : 1F                     		rra
+(1)  114/  51F : 1F                     		rra
+(1)  115/  520 : 1F                     		rra
+(1)  116/  521 : CD 25 05               		call	.conv
+(1)  117/  524 : F1                     		pop	af
+(1)  118/  525 : E6 0F                  .conv:		and	0Fh
+(1)  119/  527 : C6 90                  		add	a, 90h
+(1)  120/  529 : 27                     		daa
+(1)  121/  52A : CE 40                  		adc	a, 40h
+(1)  122/  52C : 27                     		daa
+(1)  123/  52D : CD 46 03               		call	tft_print
+(1)  124/  530 : C9                     		ret
+(1)  125/  531 :                        
+(1)  126/  531 :                        ;
+(1)  127/  531 :                        ; HL - src, DE - dest
+(1)  128/  531 :                        ; Returns size in BC
+(1)  129/  531 :                        ;
+(1)  130/  531 :                        copy_line:
+(1)  131/  531 : 01 00 00               	ld	bc, 0
+(1)  132/  534 : 7E                     -	ld	a, (hl)
+(1)  133/  535 : FE 0A                  	cp	"\n"
+(1)  134/  537 : 12                     	ld	(de), a
+(1)  135/  538 : C8                     	ret	z
+(1)  136/  539 : 2C                     	inc	l
+(1)  137/  53A : 13                     	inc	de
+(1)  138/  53B : 03                     	inc	bc
+(1)  139/  53C : 18 F6                  	jr	-
+(1)  140/  53E :                        
+(1)  141/  53E :                        
+(1)  142/  53E :                        ;
+(1)  143/  53E :                        ; hl - source to compare
+(1)  144/  53E :                        ; de - dest
+(1)  145/  53E :                        ; sets carry on equal
+(1)  146/  53E :                        ;
+(1)  147/  53E :                        strcmp:
+(1)  148/  53E : 1A                     	ld	a, (de)
+(1)  149/  53F : 47                     	ld	b, a
+(1)  150/  540 : 7E                     	ld	a, (hl)
+(1)  151/  541 : A7                     	and	a		; test (hl) for zero
+(1)  152/  542 : 28 07                  	jr	z, .ok
+(1)  153/  544 : B8                     	cp	b
+(1)  154/  545 : 20 06                  	jr	nz, .fail
+(1)  155/  547 : 23                     	inc	hl
+(1)  156/  548 : 13                     	inc	de
+(1)  157/  549 : 18 F3                  	jr	strcmp
+(1)  158/  54B : 37                     .ok:	scf
+(1)  159/  54C : C9                     	ret
+(1)  160/  54D : A7                     .fail:	and	a
+(1)  161/  54E : C9                     	ret
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm(io.asm) - Page 17 - 16.02.2026 10:22:44
+
+
+(1)  162/  54F :                        
+(1)  163/  54F :                        
+(1)  164/  54F :                        
+  678/  54F :                           
+  679/  54F :                           BANNER:
+  680/  54F : 4B 6F 75 76 6F 73 74 6F   		db	"Kouvosto Telecom Rain Gutter Calculator V0.1rc1beta2\r\n"
+        557 : 20 54 65 6C 65 63 6F 6D
+        55F : 20 52 61 69 6E 20 47 75
+        567 : 74 74 65 72 20 43 61 6C
+        56F : 63 75 6C 61 74 6F 72 20
+        577 : 56 30 2E 31 72 63 31 62
+        57F : 65 74 61 32 0D 0A      
+  681/  585 : 55 6E 61 75 74 68 6F 72   		db	"Unauthorized use forbidden.\r\n",0
+        58D : 69 7A 65 64 20 75 73 65
+        595 : 20 66 6F 72 62 69 64 64
+        59D : 65 6E 2E 0D 0A 00      
+  682/  5A3 :                           
+  683/  5A3 :                           PROMPT:
+  684/  5A3 : 52 61 69 6E 20 67 75 74   		db	"Rain gutter code:", 0
+        5AB : 74 65 72 20 63 6F 64 65
+        5B3 : 3A 00                  
+  685/  5B5 :                           
+  686/  5B5 :                           PRICE:
+  687/  5B5 : 20 6B 6F 75 76 6F 73 74   		db	" kouvosto bucks per furlong.\r\n",0
+        5BD : 6F 20 62 75 63 6B 73 20
+        5C5 : 70 65 72 20 66 75 72 6C
+        5CD : 6F 6E 67 2E 0D 0A 00   
+  688/  5D4 :                           
+  689/  5D4 :                           ;
+  690/  5D4 :                           ; CGA colors, 2 bytes per color, 5-6-5 format
+  691/  5D4 :                           ;
+  692/  5D4 :                           		ALIGN	0x0020
+  693/  5E0 :                           TFT_PALETTE:
+  694/  5E0 : 00 00                     		dw	0x0000		; 0 - Black
+  695/  5E2 : 15 00                     		dw	0x0015		; 1 - Blue
+  696/  5E4 : 40 05                     		dw	0x0540		; 2 - Green
+  697/  5E6 : 55 05                     		dw	0x0555		; 3 - Teal
+  698/  5E8 : 00 A8                     		dw	0xA800		; 4 - Red
+  699/  5EA : 15 A8                     		dw	0xA815		; 5 - Pink
+  700/  5EC : A0 AA                     		dw	0xAAA0		; 6 - Brown
+  701/  5EE : 55 AD                     		dw	0xAD55		; 7 - Light grey
+  702/  5F0 : AA 52                     		dw	0x52AA		; 8 - Dark grey
+  703/  5F2 : BF 52                     		dw	0x52BF		; 9 - Light blue
+  704/  5F4 : EA 57                     		dw	0x57EA		; 10 - Light green
+  705/  5F6 : FF 57                     		dw	0x57FF		; 11 - Light teal
+  706/  5F8 : AA FA                     		dw	0xFAAA		; 12 - Light red
+  707/  5FA : BF FA                     		dw	0xFABF		; 13 - Light pink
+  708/  5FC : EA FF                     		dw	0xFFEA		; 14 - Yellow
+  709/  5FE : FF FF                     		dw	0xFFFF		; 15 - White
+  710/  600 :                           
+  711/ 7000 :                           		ORG	7000h
+  712/ 7000 :                           flag1:
+  713/ 7000 : =>DEFINED                 		ifdef	secrets
+  714/ 7000 : 44 49 53 4F 42 45 59 5B   		db	"DISOBEY[Consider trying harder for the second flag!]",0
+       7008 : 43 6F 6E 73 69 64 65 72
+       7010 : 20 74 72 79 69 6E 67 20
+       7018 : 68 61 72 64 65 72 20 66
+       7020 : 6F 72 20 74 68 65 20 73
+       7028 : 65 63 6F 6E 64 20 66 6C
+       7030 : 61 67 21 5D 00         
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 18 - 16.02.2026 10:22:44
+
+
+  715/ 7035 : =>FALSE                   		elseif
+  716/ 7035 :                           		db	"DISOBEY[                                           ]",0
+  717/ 7035 : [713]                     		endif
+  718/ 7035 :                           
+  721/ 7835 :                           		listing	on
+  722/ 7835 :                           
+  723/ 7835 :                           		; This area will not be directly accessible, as it is not mapped with the MMU
+  724/ DEAD :                           		ORG	0deadh
+  725/ DEAD : =>DEFINED                 		ifdef	secrets
+  726/ DEAD : 4E 79 74 20 65 69 20 6B   FLAG:		db	"Nyt ei kyllä pää kestä arvon henkilöstöpäälikkö Jorma Roposta ollenkaan. "
+       DEB5 : 79 6C 6C C3 A4 20 70 C3
+       DEBD : A4 C3 A4 20 6B 65 73 74
+       DEC5 : C3 A4 20 61 72 76 6F 6E
+       DECD : 20 68 65 6E 6B 69 6C C3
+       DED5 : B6 73 74 C3 B6 70 C3 A4
+       DEDD : C3 A4 6C 69 6B 6B C3 B6
+       DEE5 : 20 4A 6F 72 6D 61 20 52
+       DEED : 6F 70 6F 73 74 61 20 6F
+       DEF5 : 6C 6C 65 6E 6B 61 61 6E
+       DEFD : 2E 20                  
+  727/ DEFF : 54 C3 A4 6E 20 68 6F 6D   		db	"Tän homman piti olla helppo, yks insinöörikeikka noille kouvosto telecomin urpoille, "
+       DF07 : 6D 61 6E 20 70 69 74 69
+       DF0F : 20 6F 6C 6C 61 20 68 65
+       DF17 : 6C 70 70 6F 2C 20 79 6B
+       DF1F : 73 20 69 6E 73 69 6E C3
+       DF27 : B6 C3 B6 72 69 6B 65 69
+       DF2F : 6B 6B 61 20 6E 6F 69 6C
+       DF37 : 6C 65 20 6B 6F 75 76 6F
+       DF3F : 73 74 6F 20 74 65 6C 65
+       DF47 : 63 6F 6D 69 6E 20 75 72
+       DF4F : 70 6F 69 6C 6C 65 2C 20
+  728/ DF57 : 6D 75 74 74 61 20 74 C3   		db	"mutta tää keikka on ihan tuskaa, ei näillä oo täällä kouvosto telecomilla minkäänlaista "
+       DF5F : A4 C3 A4 20 6B 65 69 6B
+       DF67 : 6B 61 20 6F 6E 20 69 68
+       DF6F : 61 6E 20 74 75 73 6B 61
+       DF77 : 61 2C 20 65 69 20 6E C3
+       DF7F : A4 69 6C 6C C3 A4 20 6F
+       DF87 : 6F 20 74 C3 A4 C3 A4 6C
+       DF8F : 6C C3 A4 20 6B 6F 75 76
+       DF97 : 6F 73 74 6F 20 74 65 6C
+       DF9F : 65 63 6F 6D 69 6C 6C 61
+       DFA7 : 20 6D 69 6E 6B C3 A4 C3
+       DFAF : A4 6E 6C 61 69 73 74 61
+       DFB7 : 20                     
+  729/ DFB8 : 63 61 64 69 61 20 74 61   		db	"cadia tai ees kunnon tietokoneita. Nyt tähän kuukauden hommaan on mennyt jo pari vuotta ja "
+       DFC0 : 69 20 65 65 73 20 6B 75
+       DFC8 : 6E 6E 6F 6E 20 74 69 65
+       DFD0 : 74 6F 6B 6F 6E 65 69 74
+       DFD8 : 61 2E 20 4E 79 74 20 74
+       DFE0 : C3 A4 68 C3 A4 6E 20 6B
+       DFE8 : 75 75 6B 61 75 64 65 6E
+       DFF0 : 20 68 6F 6D 6D 61 61 6E
+       DFF8 : 20 6F 6E 20 6D 65 6E 6E
+       E000 : 79 74 20 6A 6F 20 70 61
+       E008 : 72 69 20 76 75 6F 74 74
+       E010 : 61 20 6A 61 20         
+  730/ E015 : 6D 65 6E 69 6E 20 73 69   		db	"menin sitten tyhmänä ottamaan urakkapalkan. Koska pännii niin tässä on niiden idioottejen "
+       E01D : 74 74 65 6E 20 74 79 68
+       E025 : 6D C3 A4 6E C3 A4 20 6F
+       E02D : 74 74 61 6D 61 61 6E 20
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 19 - 16.02.2026 10:22:44
+
+
+       E035 : 75 72 61 6B 6B 61 70 61
+       E03D : 6C 6B 61 6E 2E 20 4B 6F
+       E045 : 73 6B 61 20 70 C3 A4 6E
+       E04D : 6E 69 69 20 6E 69 69 6E
+       E055 : 20 74 C3 A4 73 73 C3 A4
+       E05D : 20 6F 6E 20 6E 69 69 64
+       E065 : 65 6E 20 69 64 69 6F 6F
+       E06D : 74 74 65 6A 65 6E 20   
+  731/ E074 : 75 75 73 69 6E 20 73 61   		db	"uusin salasana kaikkiin järjestelmiin: "
+       E07C : 6C 61 73 61 6E 61 20 6B
+       E084 : 61 69 6B 6B 69 69 6E 20
+       E08C : 6A C3 A4 72 6A 65 73 74
+       E094 : 65 6C 6D 69 69 6E 3A 20
+  732/ E09C :                           
+  733/ E09C : 44 49 53 4F 42 45 59 5B   		db	"DISOBEY[Now you know how to map memory!]",0
+       E0A4 : 4E 6F 77 20 79 6F 75 20
+       E0AC : 6B 6E 6F 77 20 68 6F 77
+       E0B4 : 20 74 6F 20 6D 61 70 20
+       E0BC : 6D 65 6D 6F 72 79 21 5D
+       E0C4 : 00                     
+  734/ E0C5 : =218H                     FLAG_LEN	equ	$ - FLAG
+  735/ E0C5 : [725]                     		endif
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 20 - 16.02.2026 10:22:44
+
+
+  Symbol Table (* = unused):
+  --------------------------
+
+*APP_BNKS :                     0FF - | *ARCHITECTURE :  "x86_64-apple-osx" - |
+*ASCI0_BASE :                    80 - |  ASCI0_RX_BUF :               0DE00 C |
+*ASCI0_RX_RD :                0E000 C |  ASCI0_RX_WR :                0E001 C |
+*ASCI0_TX_BUF :               0DD00 C | *ASCI0_TX_RD :                0E002 C |
+*ASCI0_TX_WR :                0E003 C | *ASCI1_BASE :                    81 - |
+*ASCI_ASCI :                      1 - | *ASCI_ASCIB :                     2 - |
+*ASCI_BUFSZ :                    20 - | *ASCI_DEF_ASEXT :                60 - |
+*ASCI_DEF_CNTLA :                64 - | *ASCI_DEF_CNTLB :                20 - |
+ ASCI_ISR :                     16C C | *ASCI_NONE :                      0 - |
+*ASCI_RTS :                      10 - |  BANNER :                       54F C |
+*BDOS :                           5 - | *CASESENSITIVE :                  0 - |
+*CONIN :                          1 - | *CONOUT :                         2 - |
+*CONSTPI :        3.141592653589793 - | *COPY_LINE :                    531 C |
+*CPUOSC :                   1194000 - | *DATE :                "16.02.2026" - |
+*DMA_COUNT :                    100 - | *DMA_DEST_ADDR :               9000 - |
+*DMA_SRC_ADDR :                8000 - |  EI_RETI :                      0D1 C |
+*FALSE :                          0 - |  FLAG :                       0DEAD C |
+*FLAG1 :                       7000 C | *FLAG_LEN :                     218 - |
+ FONT8X8U :                    7035 C |  FP_LED_IO :                      0 - |
+*FULLPMMU :                       1 - |  GETC0 :                        4FB C |
+*GETC1 :                        506 C | *HAS64 :                          1 - |
+*HASFPU :                         0 - | *HASPMMU :                        0 - |
+*INSUPMODE :                      0 - | *INTMODE :                        2 - |
+*IO_PORT_ADDR :                 0C0 - |  ISR_INIT :                     186 C |
+ ISR_PAGE :                   0DF00 C |  LED_STATE :                  0E006 C |
+ LED_TIMER :                  0E007 C | *LISTON :                         1 - |
+*MACEXP :                         7 - |  MAIN :                           2 C |
+ MAIN.FAKE_PROCESS :             94 C |  MEM_START :                   8000 - |
+*MOMCPU :                       180 - | *MOMCPUNAME :                "Z180" - |
+*MPGENA :                        7C - | *MPGSEL_0 :                      78 - |
+*MPGSEL_1 :                      79 - | *MPGSEL_2 :                      7A - |
+*MPGSEL_3 :                      7B - | *NESTMAX :                      100 - |
+ NEWLINE :                      0BC C | *PADDING :                        1 - |
+ PRICE :                        5B5 C |  PRINT_BYTE :                   51C C |
+ PRINT_BYTE.CONV :              525 C | *PRINT_WORD :                   511 C |
+ PROMPT :                       5A3 C |  PRT_ISR :                      141 C |
+ PRT_ISR.END :                  167 C |  PUTC0 :                        4E1 C |
+ PUTC0.LOOP :                   4E2 C |  PUTC1 :                        4EE C |
+ PUTC1.LOOP :                   4EF C |  PUTS0 :                        4C3 C |
+*PUTS0_IM :                     4DB C |  PUTS1 :                        4BA C |
+*PUTS1_IM :                     4D5 C |  PUTS_TFT :                     4CC C |
+ RAMBIAS :                      200 - |  RAMSIZE :                      200 - |
+*RELAXED :                        1 - |  ROMSIZE :                      200 - |
+*SECRETS :                        1 - |  STACK :                      0DD00 - |
+ STRCMP :                       53E C |  STRCMP.FAIL :                  54D C |
+ STRCMP.OK :                    54B C |  TFT_565 :                       55 - |
+ TFT_888 :                       66 - |  TFT_BG :                     0E00A C |
+ TFT_CASET :                     2A - |  TFT_CLEAR :                    1B4 C |
+ TFT_CLEAR.LOOP :               1E9 C |  TFT_CMD :                       54 - |
+*TFT_CMD_NOP :                    0 - |  TFT_COL :                    0E005 C |
+ TFT_COLMOD :                    3A - |  TFT_COLS :                     0A0 - |
+ TFT_DATA :                      55 - | *TFT_DISPOFF :                   28 - |
+ TFT_DISPON :                    29 - | *TFT_DRAW_BG :                  41A C |
+*TFT_DRAW_FG :                  413 C |  TFT_FG :                     0E00C C |
+ TFT_GAMMA :                      2 - |  TFT_GAMSET :                    26 - |
+ TFT_GETGLYPH :                 45A C | *TFT_IDMOFF :                    38 - |
+*TFT_IDMON :                     39 - |  TFT_INIT :                     470 C |
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 21 - 16.02.2026 10:22:44
+
+
+ TFT_INVOFF :                    20 - | *TFT_INVON :                     21 - |
+ TFT_MADCTL :                    36 - | *TFT_MADCTL_MH :                  4 - |
+*TFT_MADCTL_ML :                 10 - |  TFT_MADCTL_MV :                 20 - |
+*TFT_MADCTL_MX :                 40 - |  TFT_MADCTL_MY :                 80 - |
+ TFT_MADCTL_RGB :                 8 - |  TFT_MADCTL_VAL :               0A8 - |
+*TFT_NORON :                     13 - |  TFT_PALETTE :                  5E0 C |
+ TFT_PRINT :                    346 C |  TFT_PRINT.CR :                 380 C |
+ TFT_PRINT.END :                37D C |  TFT_PRINT.NEXT_COL :           37A C |
+ TFT_PRINT.NEXT_ROW :           375 C |  TFT_PRINT.NL :                 363 C |
+*TFT_PTLAR :                     30 - | *TFT_PTLON :                     12 - |
+ TFT_PUTC :                     383 C |  TFT_PUTC.END :                 40E C |
+ TFT_PUTC.LOOP :                399 C |  TFT_RAMRD :                     2E - |
+ TFT_RAMWR :                     2C - |  TFT_RASET :                     2B - |
+*TFT_RDDCOLMOD :                 0C - | *TFT_RDDID :                      4 - |
+*TFT_RDDIM :                     0D - | *TFT_RDDPM :                     0A - |
+*TFT_RDDSDR :                    0F - | *TFT_RDDSM :                     0E - |
+*TFT_RDDST :                      9 - | *TFT_RDID1 :                    0DA - |
+*TFT_RDID2 :                    0DB - | *TFT_RDID3 :                    0DC - |
+*TFT_RGBSET :                    2D - |  TFT_ROW :                    0E004 C |
+ TFT_ROWS :                      80 - | *TFT_SCRLAR :                    33 - |
+*TFT_SCROLL :                   21A C |  TFT_SCROLL.FILL_LOOP :         2DD C |
+ TFT_SCROLL.LOOP :              24A C |  TFT_SCROLL.READ_LOOP :         260 C |
+ TFT_SCROLL.WRITE_LOOP :        288 C |  TFT_SCROLL_RASET :             307 C |
+ TFT_SET_BG :                   32D C |  TFT_SET_FG :                   314 C |
+ TFT_SET_POS :                  421 C |  TFT_SET_REGION :               43A C |
+*TFT_SLPIN :                     10 - |  TFT_SLPOUT :                    11 - |
+ TFT_STACK :                  0E008 C | *TFT_SWRESET :                    1 - |
+*TFT_TEOFF :                     34 - | *TFT_TEON :                      35 - |
+*TFT_VSCSAD :                    37 - | *TIME :                  "10:22:44" - |
+*TRUE :                           1 - |  UART_INIT :                    495 C |
+*VERSION :                     142F - |  Z180_ASEXT0 :                   92 - |
+ Z180_ASEXT1 :                   93 - | *Z180_ASTC0H :                   9B - |
+*Z180_ASTC0L :                   9A - | *Z180_ASTC1H :                   9D - |
+*Z180_ASTC1L :                   9C - |  Z180_BASE :                     80 - |
+*Z180_BBR :                     0B9 - | *Z180_BCR0H :                   0A7 - |
+*Z180_BCR0L :                   0A6 - | *Z180_BCR1H :                   0AF - |
+*Z180_BCR1L :                   0AE - |  Z180_CBAR :                    0BA - |
+ Z180_CBR :                     0B8 - |  Z180_CCR :                      9F - |
+*Z180_CLKDIV :                    0 - |  Z180_CMR :                      9E - |
+ Z180_CNTLA0 :                   80 - |  Z180_CNTLA1 :                   81 - |
+ Z180_CNTLB0 :                   82 - |  Z180_CNTLB1 :                   83 - |
+ Z180_CNTR :                     8A - |  Z180_CNTR_DEF :                  6 - |
+*Z180_DAR0B :                   0A5 - | *Z180_DAR0H :                   0A4 - |
+*Z180_DAR0L :                   0A3 - |  Z180_DCNTL :                   0B2 - |
+*Z180_DMODE :                   0B1 - | *Z180_DSTAT :                   0B0 - |
+*Z180_FRC :                      98 - | *Z180_IAR1B :                   0AD - |
+*Z180_IAR1H :                   0AC - | *Z180_IAR1L :                   0AB - |
+*Z180_ICR :                     0BF - | *Z180_IL :                      0B3 - |
+*Z180_IOWAIT :                    1 - |  Z180_ISR_TABLE :               0BF C |
+*Z180_ISR_TABLE.ASCI0 :         0CD C | *Z180_ISR_TABLE.ASCI1 :         0CF C |
+*Z180_ISR_TABLE.CSI :           0CB C | *Z180_ISR_TABLE.DMA0 :          0C7 C |
+*Z180_ISR_TABLE.DMA1 :          0C9 C | *Z180_ISR_TABLE.INT1 :          0BF C |
+*Z180_ISR_TABLE.INT2 :          0C1 C | *Z180_ISR_TABLE.PRT0 :          0C3 C |
+*Z180_ISR_TABLE.PRT1 :          0C5 C |  Z180_ITC :                     0B4 - |
+*Z180_MAR1B :                   0AA - | *Z180_MAR1H :                   0A9 - |
+*Z180_MAR1L :                   0A8 - | *Z180_MEMWAIT :                   0 - |
+*Z180_OMCR :                    0BE - |  Z180_RCR :                     0B6 - |
+ Z180_RDR0 :                     88 - |  Z180_RDR1 :                     89 - |
+*Z180_RLDR0H :                   8F - | *Z180_RLDR0L :                   8E - |
+ Z180_RLDR1H :                   97 - |  Z180_RLDR1L :                   96 - |
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 22 - 16.02.2026 10:22:44
+
+
+*Z180_SAR0B :                   0A2 - | *Z180_SAR0H :                   0A1 - |
+*Z180_SAR0L :                   0A0 - |  Z180_STAT0 :                    84 - |
+ Z180_STAT1 :                    85 - |  Z180_TCR :                      90 - |
+ Z180_TDR0 :                     86 - |  Z180_TDR1 :                     87 - |
+*Z180_TMDR0H :                   8D - |  Z180_TMDR0L :                   8C - |
+ Z180_TMDR1H :                   95 - |  Z180_TMDR1L :                   94 - |
+*Z180_TRDR :                     8B - |  __BACK0 :                       86 C |
+ __BACK1 :                      0B2 C |  __BACK2 :                      534 C |
+ __FORW0 :                      158 C |  __FORW1 :                      253 C |
+ __FORW19 :                     452 C | *__FORW2 :                      256 C |
+
+    254 symbols
+    132 unused symbols
+
+ AS V1.42 Beta [Bld 254] - Source File gutter.asm - Page 23 - 16.02.2026 10:22:44
+
+
+  Code Pages:
+  ----------
+
+STANDARD (0 changed characters)
+
+1 code page
+
+0.02 seconds assembly time
+
+   1287 lines source file
+   1407 lines incl. macro expansions
+      2 passes
+      0 errors
+      0 warnings
